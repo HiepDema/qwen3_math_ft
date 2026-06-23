@@ -33,6 +33,7 @@ qwen3-vl-math/
 │   ├── generate_data.py          # Sinh data (Gemini/OpenAI/Local)
 │   ├── train_cpt_unsloth.py      # CPT training
 │   ├── train_sft_unsloth.py      # SFT training
+│   ├── evaluate.py               # Đánh giá model (Exact Match, Format, Steps)
 │   ├── inference.py              # Test model
 │   └── run_pipeline.py           # Full pipeline (1 lệnh)
 ├── configs/
@@ -88,10 +89,13 @@ python scripts/train_cpt_unsloth.py
 # 3. SFT - Supervised Fine-Tuning (học giải bài theo format)
 python scripts/train_sft_unsloth.py --cpt-path outputs/cpt_linear_eq/final
 
-# 4. Test model
+# 4. Đánh giá model
+python scripts/evaluate.py --model-path outputs/sft_linear_eq/final --num-tests 50
+
+# 5. Test model
 python scripts/inference.py --model-path outputs/sft_linear_eq/final
 
-# 5. Interactive mode
+# 6. Interactive mode
 python scripts/inference.py --model-path outputs/sft_linear_eq/final --interactive
 ```
 
@@ -115,6 +119,7 @@ Mở file `notebooks/finetune_qwen3_linear_eq.py` trong Colab - tất cả đã 
 | Data Gen | Sinh data bằng Gemini/OpenAI/Local | `data/raw/*.jsonl` |
 | CPT | LoRA train trên corpus toán (next-token prediction) | `outputs/cpt_linear_eq/final` |
 | SFT | LoRA train trên instruction-response pairs | `outputs/sft_linear_eq/final` |
+| Evaluate | Đánh giá Exact Match, Format, Step Correctness | Report |
 | Inference | Load model và giải phương trình | Kết quả step-by-step |
 
 ## Training Config
@@ -145,6 +150,38 @@ Mở file `notebooks/finetune_qwen3_linear_eq.py` trong Colab - tất cả đã 
 }
 ```
 
+## Evaluation
+
+Chạy evaluation trên 50 phương trình test (sinh ngẫu nhiên, khác seed với training data):
+
+```bash
+python scripts/evaluate.py --model-path outputs/sft_linear_eq/final --num-tests 50 --verbose
+```
+
+Output:
+
+```
+══════════════════════════════════════════════════════════════
+EVALUATION REPORT
+══════════════════════════════════════════════════════════════
+
+  Metric                    Score      Count
+  ──────────────────────────────────────────────────────
+  Exact Match                92.0%     46/50
+  Format Compliance          96.0%     48/50
+  Step 1 (chuyển vế)         90.0%     45/50
+  Step 2 (tìm x)            92.0%     46/50
+  All Steps Correct          88.0%     44/50
+```
+
+| Metric | Đo gì | Target |
+|--------|--------|--------|
+| **Exact Match** | Đáp án cuối cùng đúng/sai | > 80% |
+| **Format Compliance** | Output đúng format (Ta có:... Đáp án:...) | > 90% |
+| **Step 1** | Bước chuyển vế đúng (ax = c-b) | > 70% |
+| **Step 2** | Bước tìm x đúng (x = kết quả) | > 80% |
+| **All Steps** | Tất cả bước trung gian đúng | > 70% |
+
 ## Tech Stack
 
 | Component | Tools |
@@ -153,4 +190,5 @@ Mở file `notebooks/finetune_qwen3_linear_eq.py` trong Colab - tất cả đã 
 | Training Framework | Unsloth, TRL (SFTTrainer) |
 | LoRA | PEFT, 4-bit QLoRA |
 | Data Generation | Gemini API / OpenAI API / Local |
+| Evaluation | Exact Match, Format Check, Step Correctness |
 | Quantization | bitsandbytes (4-bit NF4) |
