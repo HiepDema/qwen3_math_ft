@@ -1,0 +1,47 @@
+# Evaluation Configuration
+
+model:
+  name: "outputs/sft/final"
+  load_in_4bit: true
+  max_seq_length: 2048
+
+benchmarks:
+  - name: "gsm8k"
+    dataset: "openai/gsm8k"
+    split: "test"
+    num_samples: 500
+    metric: "accuracy"
+    few_shot: 5
+
+  - name: "math"
+    dataset: "hendrycks/competition_math"
+    split: "test"
+    num_samples: 500
+    metric: "accuracy"
+    few_shot: 4
+
+  - name: "minerva_math"
+    dataset: "math_dataset"
+    split: "test"
+    num_samples: 200
+    metric: "accuracy"
+
+generation:
+  max_new_tokens: 1024
+  temperature: 0.1
+  top_p: 0.95
+  do_sample: false
+  repetition_penalty: 1.1
+
+llm_judge:
+  enabled: true
+  judge_model: "gpt-4o-mini"
+  criteria:
+    - correctness
+    - reasoning_quality
+    - step_completeness
+
+reporting:
+  output_dir: "outputs/eval"
+  save_predictions: true
+  mlflow_tracking: true

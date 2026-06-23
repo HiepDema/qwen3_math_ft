@@ -1,0 +1,71 @@
+# Supervised Fine-Tuning Configuration
+# Task: Teach Qwen3-VL to solve math problems with chain-of-thought
+
+model:
+  name: "Qwen/Qwen3-VL-7B"
+  # Load from CPT checkpoint if available
+  cpt_checkpoint: "outputs/cpt/final"
+  load_in_4bit: true
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  use_flash_attention: true
+  max_seq_length: 2048
+
+lora:
+  r: 32
+  lora_alpha: 64
+  lora_dropout: 0.05
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  task_type: "CAUSAL_LM"
+
+dataset:
+  name: "AI-MO/NuminaMath-CoT"
+  split: "train"
+  max_samples: 50000
+  instruction_field: "problem"
+  response_field: "solution"
+  max_length: 2048
+
+  # Chat template for SFT
+  system_prompt: |
+    You are a mathematical reasoning assistant. Solve problems step by step,
+    showing clear chain-of-thought reasoning. Always verify your answer.
+
+training:
+  output_dir: "outputs/sft"
+  num_train_epochs: 3
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  learning_rate: 1.0e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.05
+  lr_scheduler_type: "cosine"
+  bf16: true
+  gradient_checkpointing: true
+  logging_steps: 10
+  save_steps: 200
+  save_total_limit: 3
+  eval_steps: 200
+  eval_strategy: "steps"
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+  dataloader_num_workers: 4
+  optim: "adamw_8bit"
+  max_grad_norm: 1.0
+  seed: 42
+
+  # SFT specific
+  packing: true
+  neftune_noise_alpha: 5.0
+
+mlflow:
+  tracking_uri: "http://localhost:5000"
+  experiment_name: "qwen3-vl-math-sft"
+  run_name: "sft-numinamath-cot-lora32"

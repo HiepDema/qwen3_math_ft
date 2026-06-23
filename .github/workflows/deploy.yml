@@ -1,0 +1,98 @@
+name: Deploy Model
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_version:
+        description: "Model version to deploy"
+        required: true
+      environment:
+        description: "Deployment environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      approved: ${{ steps.validate.outputs.approved }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate model
+        id: validate
+        run: |
+          pip install mlflow
+          python -c "
+          from src.cicd.model_registry import ModelRegistry
+          registry = ModelRegistry('${{ secrets.MLFLOW_TRACKING_URI }}')
+          result = registry.validate_for_promotion(${{ inputs.model_version }})
+          print(f'Validation: {result}')
+          if result['passed']:
+              print('approved=true')
+          else:
+              print('approved=false')
+              exit(1)
+          "
+
+  deploy-staging:
+    runs-on: [self-hosted, gpu]
+    needs: validate
+    if: inputs.environment == 'staging'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          # Optimize model
+          python -m src.optimization.quantize --config configs/optimization_config.yaml
+
+          # Deploy with vLLM
+          docker compose -f docker/docker-compose.serving.yml up -d
+
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f http://localhost:8000/v1/models || exit 1
+
+      - name: Smoke test
+        run: |
+          python -c "
+          import requests
+          resp = requests.post('http://localhost:8000/v1/chat/completions', json={
+              'model': 'qwen3-vl-math',
+              'messages': [{'role': 'user', 'content': 'What is 2+2?'}],
+              'max_tokens': 100
+          })
+          assert resp.status_code == 200
+          print('Smoke test passed:', resp.json()['choices'][0]['message']['content'][:100])
+          "
+
+  deploy-production:
+    runs-on: [self-hosted, gpu]
+    needs: validate
+    if: inputs.environment == 'production'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Promote model
+        run: |
+          python -c "
+          from src.cicd.model_registry import ModelRegistry, ModelStage
+          registry = ModelRegistry('${{ secrets.MLFLOW_TRACKING_URI }}')
+          registry.promote(${{ inputs.model_version }}, ModelStage.PRODUCTION)
+          "
+
+      - name: Deploy
+        run: |
+          docker compose -f docker/docker-compose.serving.yml up -d --force-recreate
+
+      - name: Verify deployment
+        run: |
+          sleep 60
+          curl -f http://localhost:8000/health || exit 1
+          echo "Production deployment successful"

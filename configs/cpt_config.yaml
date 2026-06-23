@@ -1,0 +1,56 @@
+# Continual Pre-Training Configuration
+# Task: Extend Qwen3-VL's knowledge on mathematical text corpus
+
+model:
+  name: "Qwen/Qwen3-VL-7B"
+  load_in_4bit: true
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  use_flash_attention: true
+  max_seq_length: 4096
+
+lora:
+  r: 64
+  lora_alpha: 128
+  lora_dropout: 0.05
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  task_type: "CAUSAL_LM"
+
+dataset:
+  name: "open-web-math/open-web-math"
+  split: "train"
+  max_samples: 100000
+  text_field: "text"
+  max_length: 4096
+  streaming: true
+
+training:
+  output_dir: "outputs/cpt"
+  num_train_epochs: 1
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.03
+  lr_scheduler_type: "cosine"
+  bf16: true
+  gradient_checkpointing: true
+  logging_steps: 10
+  save_steps: 500
+  save_total_limit: 3
+  dataloader_num_workers: 4
+  optim: "adamw_8bit"
+  max_grad_norm: 1.0
+  seed: 42
+
+mlflow:
+  tracking_uri: "http://localhost:5000"
+  experiment_name: "qwen3-vl-math-cpt"
+  run_name: "cpt-openwebmath-lora64"
