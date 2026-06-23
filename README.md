@@ -36,6 +36,11 @@ qwen3-vl-math/
 │   ├── evaluate.py               # Đánh giá model (Exact Match, Format, Steps)
 │   ├── inference.py              # Test model
 │   └── run_pipeline.py           # Full pipeline (1 lệnh)
+├── tests/
+│   └── test_linear_eq.py         # Unit tests
+├── .github/workflows/
+│   ├── linear_eq_ci.yml          # CI: lint, test, data validation
+│   └── linear_eq_train.yml       # CD: train + evaluate + upload
 ├── configs/
 │   ├── cpt_linear_eq.yaml        # CPT hyperparameters
 │   └── sft_linear_eq.yaml        # SFT hyperparameters
@@ -182,6 +187,64 @@ EVALUATION REPORT
 | **Step 2** | Bước tìm x đúng (x = kết quả) | > 80% |
 | **All Steps** | Tất cả bước trung gian đúng | > 70% |
 
+## CI/CD
+
+Project sử dụng GitHub Actions với 2 workflows:
+
+### 1. CI Pipeline (tự động khi push/PR)
+
+```bash
+# Chạy local trước khi push
+pip install ruff pytest
+ruff check scripts/ tests/test_linear_eq.py     # Lint
+ruff format scripts/ tests/test_linear_eq.py    # Format
+pytest tests/test_linear_eq.py -v               # Unit tests
+```
+
+CI tự động chạy khi push lên `main`/`develop` hoặc tạo PR:
+
+| Job | Mô tả |
+|-----|--------|
+| **Lint** | Kiểm tra code style (ruff) |
+| **Test** | Unit tests cho data generation + evaluation logic |
+| **Data Validation** | Sinh data → validate format, consistency |
+| **Config Check** | Validate YAML configs |
+
+### 2. Train & Evaluate Pipeline (chạy manual)
+
+Trigger bằng tay trên GitHub Actions (workflow_dispatch):
+
+```
+GitHub → Actions → "Linear Equation Training & Evaluation" → Run workflow
+```
+
+Hoặc bằng CLI:
+```bash
+gh workflow run linear_eq_train.yml \
+  -f num_cpt_samples=150 \
+  -f num_sft_samples=150 \
+  -f cpt_epochs=3 \
+  -f sft_epochs=5 \
+  -f eval_threshold=70
+```
+
+Pipeline: `Generate Data → CPT → SFT → Evaluate → Upload Artifact`
+
+Nếu Exact Match < threshold → workflow FAIL, không upload model.
+
+### CI/CD Flow
+
+```
+Push/PR ──▶ Lint ──▶ Unit Test ──▶ Data Validation ──▶ Config Check
+                                                            │
+                                                            ▼ (pass)
+Manual Trigger ──▶ Generate Data ──▶ CPT ──▶ SFT ──▶ Evaluate ──▶ Upload Model
+                                                            │
+                                                     Exact Match >= 70%?
+                                                      Yes ──▶ ✓ PASS
+                                                      No  ──▶ ✗ FAIL
+```
+
 ## Tech Stack
 
 | Component | Tools |
@@ -191,4 +254,5 @@ EVALUATION REPORT
 | LoRA | PEFT, 4-bit QLoRA |
 | Data Generation | Gemini API / OpenAI API / Local |
 | Evaluation | Exact Match, Format Check, Step Correctness |
+| CI/CD | GitHub Actions |
 | Quantization | bitsandbytes (4-bit NF4) |
