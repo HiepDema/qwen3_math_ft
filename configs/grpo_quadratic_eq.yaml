@@ -1,0 +1,58 @@
+# GRPO Configuration for Quadratic Equation Solving
+# Applied after SFT to improve reasoning quality
+
+model:
+  name: "Qwen/Qwen3-0.6B"
+  sft_checkpoint: "outputs/sft_quadratic_eq/final"
+  load_in_4bit: true
+  max_seq_length: 2048
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.0
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+grpo:
+  num_generations: 4
+  beta: 0.1  # KL penalty coefficient
+  max_completion_length: 512
+
+reward:
+  weights:
+    correctness: 0.5
+    format: 0.2
+    reasoning: 0.3
+  format_checks:
+    - has_equation_statement
+    - has_coefficients_identified
+    - has_delta_calculation
+    - has_answer_conclusion
+    - has_enough_steps
+
+dataset:
+  num_prompts: 300
+  seed: 42
+
+training:
+  output_dir: "outputs/grpo_quadratic_eq"
+  num_train_epochs: 1
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 2
+  learning_rate: 5.0e-6
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  lr_scheduler_type: "cosine"
+  bf16: true
+  logging_steps: 5
+  save_steps: 50
+  save_total_limit: 2
+  optim: "adamw_8bit"
+  seed: 42
