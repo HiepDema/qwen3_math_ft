@@ -1,8 +1,23 @@
 # Qwen3-0.6B Fine-tuning: Giải phương trình bậc 2
 
-Fine-tune Qwen3-0.6B để giải phương trình bậc hai (ax² + bx + c = 0) bằng tiếng Việt, sử dụng **SFT + GRPO** với LoRA (Unsloth).
+Fine-tune Qwen3-0.6B để giải phương trình bậc hai (ax² + bx + c = 0) bằng tiếng Việt, so sánh **SFT vs GRPO** (dense reward vs sparse reward).
 
-**Teacher model:** Qwen3-VL-30B-A3B-Instruct (chạy trên GPU A10 để sinh data)
+## Mục tiêu
+
+So sánh hiệu quả của các phương pháp training:
+| Method | Mô tả |
+|--------|--------|
+| **SFT only** | Supervised fine-tuning trên data có sẵn |
+| **GRPO only (dense)** | RL với multi-signal reward (correctness + delta + format + reasoning) |
+| **GRPO only (sparse)** | RL với chỉ 1 signal (đúng/sai) |
+| **SFT → GRPO** | SFT trước, rồi GRPO để cải thiện reasoning |
+
+## Data Sources
+
+| Source | Loại | Số lượng | Mô tả |
+|--------|------|----------|--------|
+| VietJack crawl | Phương trình bậc nhất | ~30-50 clean pairs | Data thực từ web, đã clean |
+| Local generator | Phương trình bậc hai | 300 samples | Deterministic solver, 100% đúng |
 
 **Input:** `"Giải phương trình bậc hai: 2x² - 5x + 3 = 0"`
 
@@ -10,7 +25,7 @@ Fine-tune Qwen3-0.6B để giải phương trình bậc hai (ax² + bx + c = 0) 
 ```
 Ta có phương trình: 2x² - 5x + 3 = 0
 Với a = 2, b = -5, c = 3
-Tính delta: Δ = b² - 4ac = (-5)² - 4·(2)·(3) = 25 - 24 = 1
+Tính delta: Δ = b² - 4ac = (-5)² - 4·(2)·(3) = 25 - (24) = 1
 Vì Δ > 0 nên phương trình có hai nghiệm phân biệt:
 √Δ = √1 = 1
 x₁ = (-b + √Δ)/(2a) = (5 + 1)/4 = 3/2
@@ -18,34 +33,17 @@ x₂ = (-b - √Δ)/(2a) = (5 - 1)/4 = 1
 Đáp án: x₁ = 3/2, x₂ = 1
 ```
 
-## Architecture
+## GRPO Dense Reward
 
 ```
-Data Generation (Teacher)      Training Pipeline              Inference
-┌──────────────────────┐    ┌────────────────────────┐    ┌────────────┐
-│ Qwen3-VL-30B-A3B    │    │  Qwen3-0.6B (QLoRA)   │    │   Load     │
-│ (vLLM on A10 GPU)   │───▶│                        │───▶│  Merged    │
-│ ~300 samples         │    │  SFT ──▶ GRPO         │    │  Model     │
-└──────────────────────┘    └────────────────────────┘    └────────────┘
-  Teacher distillation        ~15 min on A10 GPU           Interactive
-```
+Dense Reward = 0.4 × Correctness + 0.2 × Delta + 0.2 × Format + 0.2 × Reasoning
 
-## Training Method
+- Correctness: đáp án cuối cùng đúng/sai (0 hoặc 1)
+- Delta: tính discriminant đúng (0 hoặc 1)
+- Format: có đủ các phần (Ta có / a,b,c / Δ / Đáp án / >= 5 dòng)
+- Reasoning: bước trung gian hợp lệ (b², 4ac, xét dấu, 2a)
 
-| Stage | Mô tả | Mục đích |
-|-------|--------|----------|
-| **Data Gen** | Qwen3-VL-30B-A3B-Instruct sinh 300 bài giải mẫu | Tạo data chất lượng cao |
-| **SFT** | LoRA fine-tune trên instruction-response pairs | Học format và bước giải cơ bản |
-| **GRPO** | Group Relative Policy Optimization với reward function | Cải thiện reasoning & correctness |
-
-### GRPO Reward Function
-
-```
-Reward = 0.5 × Correctness + 0.2 × Format + 0.3 × Reasoning
-
-- Correctness: Đáp án cuối cùng đúng/sai
-- Format: Có đủ các bước (phương trình → delta → xét dấu → nghiệm → đáp án)
-- Reasoning: Các bước trung gian tính toán đúng (delta, √Δ, x₁, x₂)
+vs Sparse Reward = chỉ Correctness (0 hoặc 1)
 ```
 
 ## Project Structure
@@ -53,25 +51,24 @@ Reward = 0.5 × Correctness + 0.2 × Format + 0.3 × Reasoning
 ```
 qwen3-vl-math/
 ├── scripts/
-│   ├── generate_quadratic_data.py   # Sinh data bằng teacher model / local
+│   ├── prepare_data.py              # Clean VietJack + sinh quadratic data
+│   ├── generate_quadratic_data.py   # Sinh quadratic data (standalone)
 │   ├── train_sft_quadratic.py       # SFT training (LoRA)
-│   ├── train_grpo_quadratic.py      # GRPO training (reward-based)
+│   ├── train_grpo_quadratic.py      # GRPO training (dense/sparse reward)
 │   ├── evaluate_quadratic.py        # Đánh giá model
-│   ├── run_quadratic_pipeline.py    # Full pipeline (1 lệnh)
-│   ├── generate_data.py             # [Legacy] Data gen phương trình bậc 1
-│   ├── train_sft_unsloth.py         # [Legacy] SFT phương trình bậc 1
-│   └── evaluate.py                  # [Legacy] Eval phương trình bậc 1
+│   └── run_quadratic_pipeline.py    # Full pipeline + compare experiments
 ├── configs/
-│   ├── sft_quadratic_eq.yaml        # SFT hyperparameters
-│   ├── grpo_quadratic_eq.yaml       # GRPO hyperparameters
-│   ├── sft_linear_eq.yaml           # [Legacy] SFT bậc 1
-│   └── cpt_linear_eq.yaml           # [Legacy] CPT bậc 1
+│   ├── sft_quadratic_eq.yaml        # SFT config
+│   └── grpo_quadratic_eq.yaml       # GRPO config
 ├── data/raw/
-│   └── sft_quadratic_equations.jsonl # Training data
+│   ├── cpt_vietjack_crawled.jsonl   # Raw VietJack data
+│   ├── sft_vietjack_clean.jsonl     # Cleaned → SFT format
+│   ├── sft_quadratic_equations.jsonl # Generated quadratic data
+│   └── sft_combined.jsonl           # All data combined
 ├── outputs/
-│   ├── sft_quadratic_eq/final/      # SFT checkpoint
-│   └── grpo_quadratic_eq/final/     # GRPO final model
-├── tests/
+│   ├── sft_quadratic_eq/final/      # SFT model
+│   ├── grpo_quadratic_eq/final/     # GRPO model
+│   └── exp_*/final/                 # Experiment models (compare mode)
 ├── requirements_finetune.txt
 └── pyproject.toml
 ```
@@ -81,181 +78,112 @@ qwen3-vl-math/
 ### Prerequisites
 
 - Python >= 3.10
-- GPU: NVIDIA A10 (24GB) để sinh data từ teacher model
-- GPU: >= 8GB VRAM cho SFT/GRPO training (hoặc Google Colab T4)
+- GPU with CUDA >= 8GB VRAM (A10 recommended, T4 OK)
 
 ### Installation
 
 ```bash
+pip install torch --index-url https://download.pytorch.org/whl/cu121
 pip install -r requirements_finetune.txt
 ```
 
-### Option 1: Full Pipeline (1 lệnh)
+### Option 1: Full Pipeline (SFT → GRPO)
 
 ```bash
-# Dùng local data generation (không cần A10, deterministic solver)
-python scripts/run_quadratic_pipeline.py --mode local
-
-# Dùng teacher model Qwen3-VL-30B-A3B-Instruct (cần A10 GPU)
-python scripts/run_quadratic_pipeline.py --mode teacher
-
-# Mixed mode: 200 từ teacher + 100 local
-python scripts/run_quadratic_pipeline.py --mode mixed --num-samples 300
+python scripts/run_quadratic_pipeline.py
 ```
 
-### Option 2: Chạy từng bước
+### Option 2: So sánh tất cả methods
 
 ```bash
-# 1. Sinh data (~300 samples)
-python scripts/generate_quadratic_data.py --mode local --num-samples 300
-# Hoặc dùng teacher model:
-python scripts/generate_quadratic_data.py --mode teacher --num-samples 300
-
-# 2. SFT Training
-python scripts/train_sft_quadratic.py --data-path data/raw/sft_quadratic_equations.jsonl
-
-# 3. GRPO Training (sau SFT)
-python scripts/train_grpo_quadratic.py --sft-path outputs/sft_quadratic_eq/final
-
-# 4. Đánh giá model
-python scripts/evaluate_quadratic.py --model-path outputs/grpo_quadratic_eq/final --num-tests 50 --verbose
+python scripts/run_quadratic_pipeline.py --method compare
 ```
 
-### Option 3: Chỉ đánh giá model có sẵn
+Sẽ chạy 4 experiments và eval từng cái:
+1. SFT only
+2. GRPO dense only
+3. GRPO sparse only
+4. SFT → GRPO dense
+
+### Option 3: Chạy từng bước
 
 ```bash
-python scripts/run_quadratic_pipeline.py --eval-only --model-path outputs/grpo_quadratic_eq/final
+# 1. Chuẩn bị data (VietJack clean + quadratic gen)
+python scripts/prepare_data.py --num-quadratic 300
+
+# 2a. SFT
+python scripts/train_sft_quadratic.py
+
+# 2b. GRPO (dense reward, sau SFT)
+python scripts/train_grpo_quadratic.py --sft-path outputs/sft_quadratic_eq/final --reward-mode dense
+
+# 2c. Hoặc GRPO only (từ base model, không SFT)
+python scripts/train_grpo_quadratic.py --reward-mode dense
+
+# 3. Evaluate
+python scripts/evaluate_quadratic.py --model-path outputs/grpo_quadratic_eq/final --verbose
 ```
 
-## Pipeline
+### Option 4: Chỉ 1 method cụ thể
 
-```
-┌──────────────┐     ┌─────────────┐     ┌─────────────┐     ┌───────────┐
-│  Data Gen    │────▶│    SFT      │────▶│    GRPO     │────▶│ Evaluate  │
-│  (Teacher)   │     │  (LoRA)     │     │  (Reward)   │     │           │
-└──────────────┘     └─────────────┘     └─────────────┘     └───────────┘
- 300 samples          Learn format         Optimize            Test on
- from Qwen3-VL-30B   & basic solving      reasoning           unseen eqs
+```bash
+# SFT only
+python scripts/run_quadratic_pipeline.py --method sft
+
+# GRPO only (dense)
+python scripts/run_quadratic_pipeline.py --method grpo --reward-mode dense
+
+# GRPO only (sparse) 
+python scripts/run_quadratic_pipeline.py --method grpo --reward-mode sparse
 ```
 
 ## Training Config
 
 | Parameter | SFT | GRPO |
 |-----------|-----|------|
-| Base model | Qwen/Qwen3-0.6B | SFT checkpoint |
+| Base model | Qwen/Qwen3-0.6B | SFT checkpoint hoặc base |
 | LoRA rank | 32 | 16 |
 | LoRA alpha | 64 | 32 |
 | Learning rate | 1e-4 | 5e-6 |
 | Epochs | 5 | 1 |
-| Batch size (effective) | 16 | 8 |
-| Quantization | 4-bit (QLoRA) | 4-bit (QLoRA) |
-| Num generations (GRPO) | - | 4 |
-| KL beta (GRPO) | - | 0.1 |
+| Batch size | 16 (effective) | 8 (effective) |
+| Quantization | 4-bit QLoRA | 4-bit QLoRA |
+| Num generations | - | 4 per prompt |
+| KL beta | - | 0.1 |
 
-## Data Format
-
-**SFT data** (`data/raw/sft_quadratic_equations.jsonl`):
-```json
-{
-  "instruction": "Giải phương trình bậc hai: 2x² - 5x + 3 = 0",
-  "output": "Ta có phương trình: 2x² - 5x + 3 = 0\nVới a = 2, b = -5, c = 3\nTính delta: Δ = b² - 4ac = (-5)² - 4·(2)·(3) = 25 - 24 = 1\nVì Δ > 0 nên phương trình có hai nghiệm phân biệt:\n√Δ = √1 = 1\nx₁ = (-b + √Δ)/(2a) = (5 + 1)/4 = 3/2\nx₂ = (-b - √Δ)/(2a) = (5 - 1)/4 = 1\nĐáp án: x₁ = 3/2, x₂ = 1"
-}
-```
-
-## Evaluation
+## Evaluation Metrics
 
 ```bash
-python scripts/evaluate_quadratic.py --model-path outputs/grpo_quadratic_eq/final --num-tests 50 --verbose
-```
-
-Output:
-
-```
-══════════════════════════════════════════════════════════════
-EVALUATION REPORT - Quadratic Equations
-══════════════════════════════════════════════════════════════
-
-  Metric                    Score      Count
-  ──────────────────────────────────────────────────────
-  Exact Match                85.0%     42/50
-  Answer Correct             88.0%     44/50
-  Delta Correct              92.0%     46/50
-  Format Compliance          90.0%     45/50
-  All Steps Correct          82.0%     41/50
-
-  By equation type:
-  ──────────────────────────────────────────────────────
-    no_solution                 9/10 (90%)
-    one_solution                8/10 (80%)
-    two_solutions              22/25 (88%)
-    two_solutions_irrational    5/5 (100%)
+python scripts/evaluate_quadratic.py --model-path outputs/grpo_quadratic_eq/final --num-tests 50
 ```
 
 | Metric | Đo gì | Target |
 |--------|--------|--------|
-| **Exact Match** | Delta đúng VÀ đáp án đúng | > 70% |
-| **Answer Correct** | Đáp án cuối cùng đúng | > 75% |
-| **Delta Correct** | Tính discriminant đúng | > 85% |
-| **Format Compliance** | Output đúng format step-by-step | > 85% |
-| **All Steps** | Tất cả bước + format đúng | > 65% |
+| **Exact Match** | Delta đúng + đáp án đúng | > 70% |
+| **Answer Correct** | Đáp án cuối đúng | > 75% |
+| **Delta Correct** | Tính Δ đúng | > 85% |
+| **Format Compliance** | Đúng format step-by-step | > 85% |
+| **All Steps Correct** | Tất cả đúng | > 65% |
 
-## SFT vs GRPO Comparison
+## Expected Results
 
-| Metric | SFT only | SFT + GRPO | Improvement |
-|--------|----------|------------|-------------|
-| Answer Correct | ~75% | ~88% | +13% |
-| Delta Correct | ~85% | ~92% | +7% |
-| Format | ~88% | ~90% | +2% |
-| All Steps | ~70% | ~82% | +12% |
+| Method | Answer Correct | Delta | Format |
+|--------|---------------|-------|--------|
+| SFT only | ~75% | ~85% | ~88% |
+| GRPO sparse only | ~60% | ~70% | ~50% |
+| GRPO dense only | ~70% | ~80% | ~75% |
+| **SFT → GRPO dense** | **~88%** | **~92%** | **~90%** |
 
-GRPO cải thiện đáng kể ở khả năng reasoning (tính toán trung gian) nhờ reward function
-khuyến khích model tự kiểm tra lại các bước.
-
-## Teacher Model Details
-
-**Qwen3-VL-30B-A3B-Instruct** (MoE architecture):
-- 30B total parameters, 3B active parameters
-- Chạy được trên 1x A10 GPU (24GB) với vLLM
-- Sinh data chất lượng cao với chain-of-thought reasoning
-- Hỗ trợ tiếng Việt tốt
-
-Nếu không có A10 GPU, dùng `--mode local` để sinh data bằng deterministic solver (chất lượng thấp hơn nhưng đảm bảo đúng 100%).
-
-## CI/CD
-
-### CI Pipeline (tự động khi push/PR)
-
-```bash
-pip install ruff pytest
-ruff check scripts/ tests/
-ruff format scripts/ tests/
-pytest tests/ -v
-```
-
-### Train & Evaluate Pipeline (chạy manual trên A10)
-
-```bash
-# Full pipeline
-python scripts/run_quadratic_pipeline.py --mode teacher --num-samples 300
-
-# Hoặc qua GitHub Actions
-gh workflow run quadratic_eq_train.yml \
-  -f num_samples=300 \
-  -f sft_epochs=5 \
-  -f grpo_epochs=1 \
-  -f eval_threshold=70
-```
+Dense reward > sparse reward vì cung cấp gradient signal phong phú hơn cho model.
+SFT → GRPO > GRPO only vì SFT cho base format/knowledge, GRPO refine reasoning.
 
 ## Tech Stack
 
 | Component | Tools |
 |-----------|-------|
 | Base Model | Qwen/Qwen3-0.6B |
-| Teacher Model | Qwen/Qwen3-VL-30B-A3B-Instruct |
 | Training | Unsloth + TRL (SFTTrainer, GRPOTrainer) |
-| RL Method | GRPO (Group Relative Policy Optimization) |
+| RL Method | GRPO (dense reward function) |
 | LoRA | PEFT, 4-bit QLoRA |
-| Inference (Teacher) | vLLM |
-| GPU | NVIDIA A10 (24GB) |
-| Evaluation | Exact Match, Delta, Format, Step Correctness |
-| CI/CD | GitHub Actions |
+| Data | VietJack crawl + local deterministic solver |
+| GPU | NVIDIA A10 (24GB) / T4 (16GB) |
