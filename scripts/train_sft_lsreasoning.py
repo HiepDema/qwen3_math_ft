@@ -157,11 +157,16 @@ def main():
 
     train_result = trainer.train()
 
-    # Save
+    # Save LoRA adapter
     final_dir = Path(args.output_dir) / "final"
-    print(f"\nSaving model to {final_dir}")
+    print(f"\nSaving LoRA adapter to {final_dir}")
     model.save_pretrained(str(final_dir))
     tokenizer.save_pretrained(str(final_dir))
+
+    # Save merged model (for GRPO to load cleanly)
+    merged_dir = Path(args.output_dir) / "merged"
+    print(f"Saving merged model to {merged_dir}")
+    model.save_pretrained_merged(str(merged_dir), tokenizer, save_method="merged_16bit")
 
     eval_metrics = trainer.evaluate()
     metrics = train_result.metrics

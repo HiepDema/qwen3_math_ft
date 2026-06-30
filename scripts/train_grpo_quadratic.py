@@ -212,9 +212,18 @@ def main():
     print(f"Reward mode: {args.reward_mode}")
     print("=" * 60)
 
-    # Load model
-    if args.sft_path and Path(args.sft_path).exists():
-        print(f"\nLoading base model + merging SFT adapter from: {args.sft_path}")
+    # Load model - prefer merged model (no LoRA conflict)
+    sft_merged = str(Path(args.sft_path).parent / "merged") if args.sft_path else None
+    if sft_merged and Path(sft_merged).exists():
+        print(f"\nLoading merged SFT model from: {sft_merged}")
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=sft_merged,
+            max_seq_length=args.max_seq_length,
+            load_in_4bit=True,
+            dtype=None,
+        )
+    elif args.sft_path and Path(args.sft_path).exists():
+        print(f"\nLoading SFT adapter from: {args.sft_path}")
         model, tokenizer = FastLanguageModel.from_pretrained(
             model_name=args.model_name,
             max_seq_length=args.max_seq_length,
@@ -224,7 +233,6 @@ def main():
         from peft import PeftModel
         model = PeftModel.from_pretrained(model, args.sft_path)
         model = model.merge_and_unload()
-        print("  SFT LoRA merged into base model")
     else:
         print(f"\nLoading base model: {args.model_name}")
         if args.sft_path:

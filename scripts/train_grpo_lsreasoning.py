@@ -184,8 +184,19 @@ def main():
     print("=" * 60)
 
     # Load model
-    if args.sft_path and Path(args.sft_path).exists():
-        print(f"\nLoading base model + merging SFT adapter from: {args.sft_path}")
+    # Prefer merged model (no LoRA conflict), fallback to base
+    sft_merged = str(Path(args.sft_path).parent / "merged") if args.sft_path else None
+    if sft_merged and Path(sft_merged).exists():
+        print(f"\nLoading merged SFT model from: {sft_merged}")
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=sft_merged,
+            max_seq_length=args.max_seq_length,
+            load_in_4bit=True,
+            dtype=None,
+        )
+    elif args.sft_path and Path(args.sft_path).exists():
+        print(f"\nLoading SFT adapter from: {args.sft_path}")
+        print("  (No merged model found, loading base + adapter)")
         model, tokenizer = FastLanguageModel.from_pretrained(
             model_name=args.model_name,
             max_seq_length=args.max_seq_length,
@@ -195,7 +206,6 @@ def main():
         from peft import PeftModel
         model = PeftModel.from_pretrained(model, args.sft_path)
         model = model.merge_and_unload()
-        print("  SFT LoRA merged into base model")
     else:
         print(f"\nLoading base model: {args.model_name}")
         model, tokenizer = FastLanguageModel.from_pretrained(
@@ -205,7 +215,7 @@ def main():
             dtype=None,
         )
 
-    print(f"Applying fresh LoRA for GRPO (r={args.lora_r}, alpha={args.lora_alpha})")
+    print(f"Applying LoRA for GRPO (r={args.lora_r}, alpha={args.lora_alpha})")
     model = FastLanguageModel.get_peft_model(
         model,
         r=args.lora_r,
