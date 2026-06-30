@@ -214,20 +214,27 @@ def main():
 
     # Load model
     if args.sft_path and Path(args.sft_path).exists():
-        model_path = args.sft_path
-        print(f"\nLoading SFT model: {model_path}")
+        print(f"\nLoading base model + merging SFT adapter from: {args.sft_path}")
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=args.model_name,
+            max_seq_length=args.max_seq_length,
+            load_in_4bit=True,
+            dtype=None,
+        )
+        from peft import PeftModel
+        model = PeftModel.from_pretrained(model, args.sft_path)
+        model = model.merge_and_unload()
+        print("  SFT LoRA merged into base model")
     else:
-        model_path = args.model_name
-        print(f"\nLoading base model: {model_path}")
+        print(f"\nLoading base model: {args.model_name}")
         if args.sft_path:
             print(f"  (SFT path '{args.sft_path}' not found, using base model)")
-
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_path,
-        max_seq_length=args.max_seq_length,
-        load_in_4bit=True,
-        dtype=None,
-    )
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=args.model_name,
+            max_seq_length=args.max_seq_length,
+            load_in_4bit=True,
+            dtype=None,
+        )
 
     print(f"Applying LoRA (r={args.lora_r}, alpha={args.lora_alpha})")
     model = FastLanguageModel.get_peft_model(
