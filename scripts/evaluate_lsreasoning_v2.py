@@ -17,6 +17,7 @@ import argparse
 import json
 import re
 
+import torch
 import wandb
 from unsloth import FastLanguageModel
 
@@ -77,11 +78,13 @@ def generate_response(model, tokenizer, question):
         messages, tokenize=False, add_generation_prompt=True
     )
     inputs = tokenizer(input_text, return_tensors="pt").to(model.device)
-    outputs = model.generate(
-        **inputs,
-        max_new_tokens=256,
-        do_sample=False,
-    )
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=256,
+            do_sample=False,
+            pad_token_id=tokenizer.eos_token_id,
+        )
     response = tokenizer.decode(
         outputs[0][inputs["input_ids"].shape[1]:],
         skip_special_tokens=True,
@@ -95,6 +98,8 @@ def generate_batch(model, tokenizer, questions, batch_size=16):
     tokenizer.padding_side = "left"
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    pad_token_id = tokenizer.pad_token_id
 
     for i in range(0, len(questions), batch_size):
         batch_questions = questions[i:i + batch_size]
@@ -113,18 +118,24 @@ def generate_batch(model, tokenizer, questions, batch_size=16):
             max_length=768,
         ).to(model.device)
 
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=256,
-            do_sample=False,
-        )
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=256,
+                do_sample=False,
+                pad_token_id=pad_token_id,
+            )
 
         for j, output in enumerate(outputs):
-            prompt_len = inputs["input_ids"][j].ne(tokenizer.pad_token_id).sum()
+            prompt_len = inputs["input_ids"][j].ne(pad_token_id).sum()
             response = tokenizer.decode(
                 output[prompt_len:], skip_special_tokens=True
             )
             all_responses.append(response.strip())
+
+        if (i // batch_size + 1) % 5 == 0:
+            done = min(i + batch_size, len(questions))
+            print(f"  [{done}/{len(questions)}] batches processed...")
 
     return all_responses
 
@@ -138,10 +149,12 @@ def evaluate_model(
 ):
     """Evaluate model on test set. Returns dict of metrics."""
     if method_name is None:
-        if "grpo" in model_path and "dense" in model_path:
-            method_name = "GRPO_dense"
+        if "cpt_sft" in model_path:
+            method_name = "CPT_SFT"
+        elif "grpo" in model_path and "dense" in model_path:
+            method_name = "SFT_GRPO_dense"
         elif "grpo" in model_path and "sparse" in model_path:
-            method_name = "GRPO_sparse"
+            method_name = "SFT_GRPO_sparse"
         else:
             method_name = "SFT"
 
@@ -152,7 +165,7 @@ def evaluate_model(
         model_name=model_path,
         max_seq_length=1024,
         load_in_4bit=True,
-        dtype=None,
+        dtype=torch.float16,
     )
     FastLanguageModel.for_inference(model)
 

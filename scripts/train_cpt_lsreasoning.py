@@ -16,6 +16,7 @@ import random
 from math import gcd
 from pathlib import Path
 
+import torch
 from datasets import Dataset
 from unsloth import FastLanguageModel
 from trl import SFTTrainer, SFTConfig
@@ -153,12 +154,12 @@ def train_cpt(
     print(f"Train file: {train_file}")
     print(f"Output: {output_dir}")
 
-    # Load model
+    # Load model (force float16 to match 4-bit dequantization)
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name,
         max_seq_length=max_seq_length,
         load_in_4bit=True,
-        dtype=None,
+        dtype=torch.float16,
     )
 
     model = FastLanguageModel.get_peft_model(
@@ -197,8 +198,8 @@ def train_cpt(
         weight_decay=0.01,
         warmup_ratio=0.1,
         lr_scheduler_type="cosine",
-        bf16=True,
-        fp16=False,
+        fp16=True,
+        bf16=False,
         logging_steps=10,
         save_steps=200,
         save_total_limit=2,

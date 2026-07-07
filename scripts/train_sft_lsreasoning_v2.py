@@ -11,6 +11,7 @@ import argparse
 import json
 from pathlib import Path
 
+import torch
 from datasets import Dataset
 from unsloth import FastLanguageModel
 from trl import SFTTrainer, SFTConfig
@@ -71,11 +72,12 @@ def train_sft(
 ):
     """Train SFT on the provided training data file."""
     import wandb
+    run_name = "cpt_sft" if "cpt" in model_name else "sft_lsreasoning"
     wandb.init(
         project="lsreasoning-sft-vs-grpo",
-        name="sft_lsreasoning",
+        name=run_name,
         config={
-            "method": "SFT",
+            "method": "CPT+SFT" if "cpt" in model_name else "SFT",
             "model": model_name,
             "epochs": epochs,
             "lr": lr,
@@ -91,12 +93,12 @@ def train_sft(
     print(f"Train file: {train_file}")
     print(f"Output: {output_dir}")
 
-    # Load model
+    # Load model (force float16 to match 4-bit dequantization and avoid dtype mismatch)
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name,
         max_seq_length=max_seq_length,
         load_in_4bit=True,
-        dtype=None,
+        dtype=torch.float16,
     )
 
     model = FastLanguageModel.get_peft_model(
@@ -136,8 +138,8 @@ def train_sft(
         weight_decay=0.01,
         warmup_ratio=0.1,
         lr_scheduler_type="cosine",
-        bf16=True,
-        fp16=False,
+        fp16=True,
+        bf16=False,
         logging_steps=10,
         save_steps=100,
         save_total_limit=2,
@@ -151,7 +153,7 @@ def train_sft(
         seed=seed,
         optim="adamw_8bit",
         report_to="wandb",
-        run_name="sft_lsreasoning",
+        run_name=run_name,
     )
 
     trainer = SFTTrainer(
