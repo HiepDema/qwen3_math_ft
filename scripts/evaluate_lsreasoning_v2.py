@@ -1,6 +1,7 @@
 """Evaluation module for LSReasoning experiment.
 
 Evaluates on the pre-split test file (JSONL) for fair comparison.
+Logs results to wandb with comparison charts.
 
 Metrics:
 - Exact Match: answer is exactly correct
@@ -16,6 +17,7 @@ import argparse
 import json
 import re
 
+import wandb
 from unsloth import FastLanguageModel
 
 
@@ -95,8 +97,17 @@ def evaluate_model(
     test_file: str = "data/lsreasoning_split/test.jsonl",
     num_eval: int = None,
     verbose: bool = False,
+    method_name: str = None,
 ):
     """Evaluate model on test set. Returns dict of metrics."""
+    if method_name is None:
+        if "grpo" in model_path and "dense" in model_path:
+            method_name = "GRPO_dense"
+        elif "grpo" in model_path and "sparse" in model_path:
+            method_name = "GRPO_sparse"
+        else:
+            method_name = "SFT"
+
     print(f"Model: {model_path}")
     print(f"Test file: {test_file}")
 
@@ -197,7 +208,7 @@ def evaluate_model(
             print(f"    Expected: {f['expected']}, Got: {f['got']}")
             print()
 
-    return {
+    eval_results = {
         "exact_match": results["exact_match"] / total,
         "close_match": results["close_match"] / total,
         "format_score": results["has_answer_format"] / total,
@@ -205,6 +216,32 @@ def evaluate_model(
         "by_type": {k: v[0] / v[1] for k, v in by_problem_type.items() if v[1] > 0},
         "total": total,
     }
+
+    # Log to wandb
+    wandb.init(
+        project="lsreasoning-sft-vs-grpo",
+        name=f"eval_{method_name}",
+        config={"method": method_name, "model_path": model_path, "num_eval": total},
+        reinit=True,
+    )
+    wandb.log({
+        f"eval/exact_match": eval_results["exact_match"],
+        f"eval/close_match": eval_results["close_match"],
+        f"eval/format_score": eval_results["format_score"],
+        f"eval/reasoning_score": eval_results["reasoning_score"],
+    })
+    # Log per-problem-type as a table
+    if by_problem_type:
+        table = wandb.Table(columns=["problem_type", "accuracy", "correct", "total"])
+        for ptype, (correct_count, total_t) in sorted(
+            by_problem_type.items(), key=lambda x: -x[1][1]
+        ):
+            if total_t > 0:
+                table.add_data(ptype, correct_count / total_t, correct_count, total_t)
+        wandb.log({"eval/by_problem_type": table})
+    wandb.finish()
+
+    return eval_results
 
 
 def main():

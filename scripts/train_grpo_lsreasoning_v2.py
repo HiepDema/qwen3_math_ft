@@ -158,6 +158,27 @@ def train_grpo(
     seed: int = 42,
 ):
     """Train GRPO on the provided training data file."""
+    import wandb
+    run_name = f"grpo_{reward_mode}"
+    wandb.init(
+        project="lsreasoning-sft-vs-grpo",
+        name=run_name,
+        config={
+            "method": f"GRPO_{reward_mode}",
+            "model": model_name,
+            "sft_path": sft_path,
+            "reward_mode": reward_mode,
+            "epochs": epochs,
+            "lr": lr,
+            "batch_size": batch_size,
+            "num_generations": num_generations,
+            "beta": beta,
+            "lora_r": lora_r,
+            "lora_alpha": lora_alpha,
+        },
+        reinit=True,
+    )
+
     print(f"Reward mode: {reward_mode}")
     print(f"SFT path: {sft_path}")
     print(f"Train file: {train_file}")
@@ -265,6 +286,8 @@ def train_grpo(
         beta=beta,
         seed=seed,
         optim="adamw_8bit",
+        report_to="wandb",
+        run_name=run_name,
     )
 
     trainer = GRPOTrainer(
@@ -291,6 +314,8 @@ def train_grpo(
     print(f"\nGRPO ({reward_mode}) Done!")
     print(f"  Train loss: {metrics.get('train_loss', 'N/A')}")
     print(f"  Saved: {final_dir}")
+
+    wandb.finish()
 
 
 def main():

@@ -14,6 +14,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -88,12 +89,15 @@ def main():
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
+    os.environ.setdefault("WANDB_PROJECT", "lsreasoning-sft-vs-grpo")
+
     print("=" * 60)
     print("LSReasoning-15000: SFT vs GRPO (Dense vs Sparse)")
     print("=" * 60)
     print(f"  Model: {args.model_name}")
     print(f"  Data split: 80% train / 20% test")
     print(f"  Seed: {args.seed}")
+    print(f"  wandb project: lsreasoning-sft-vs-grpo")
     print()
 
     # Step 0: Prepare data
@@ -173,7 +177,18 @@ def main():
                                       num_eval=args.num_eval,
                                       verbose=args.verbose)
 
-    # Final comparison
+    # Save results to JSON for plotting
+    os.makedirs("outputs", exist_ok=True)
+    results_file = "outputs/experiment_results.json"
+    with open(results_file, "w") as f:
+        json.dump(results, f, indent=2)
+    print(f"\nResults saved to {results_file}")
+
+    # Generate comparison charts on wandb
+    from plot_comparison_wandb import plot_comparison
+    plot_comparison(results)
+
+    # Final comparison (console)
     print("\n" + "=" * 60)
     print("FINAL COMPARISON")
     print("=" * 60)

@@ -70,6 +70,23 @@ def train_sft(
     seed: int = 42,
 ):
     """Train SFT on the provided training data file."""
+    import wandb
+    wandb.init(
+        project="lsreasoning-sft-vs-grpo",
+        name="sft_lsreasoning",
+        config={
+            "method": "SFT",
+            "model": model_name,
+            "epochs": epochs,
+            "lr": lr,
+            "batch_size": batch_size,
+            "grad_accum": grad_accum,
+            "lora_r": lora_r,
+            "lora_alpha": lora_alpha,
+        },
+        reinit=True,
+    )
+
     print(f"Model: {model_name}")
     print(f"Train file: {train_file}")
     print(f"Output: {output_dir}")
@@ -133,6 +150,8 @@ def train_sft(
         packing=True,
         seed=seed,
         optim="adamw_8bit",
+        report_to="wandb",
+        run_name="sft_lsreasoning",
     )
 
     trainer = SFTTrainer(
@@ -164,6 +183,8 @@ def train_sft(
     print(f"  Train loss: {metrics.get('train_loss', 'N/A'):.4f}")
     print(f"  Eval loss: {eval_metrics.get('eval_loss', 'N/A'):.4f}")
     print(f"  Saved: {final_dir}")
+
+    wandb.finish()
 
 
 def main():
