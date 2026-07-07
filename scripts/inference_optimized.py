@@ -23,7 +23,6 @@ import time
 from pathlib import Path
 
 import torch
-from transformers import StaticCache
 from unsloth import FastLanguageModel
 
 
@@ -109,23 +108,12 @@ def inference_static_cache(model, tokenizer, questions, batch_size=8, max_new_to
             max_length=768,
         ).to(model.device)
 
-        current_batch_size = inputs["input_ids"].shape[0]
-        seq_length = inputs["input_ids"].shape[1] + max_new_tokens
-
-        past_key_values = StaticCache(
-            config=model.config,
-            batch_size=current_batch_size,
-            max_cache_len=seq_length,
-            device=model.device,
-            dtype=model.dtype,
-        )
-
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=max_new_tokens,
                 do_sample=False,
-                past_key_values=past_key_values,
+                cache_implementation="static",
             )
 
         for j, output in enumerate(outputs):
