@@ -1,0 +1,1 @@
+{"columns":["method","Exact Match","Close Match","Format","Reasoning"],"data":[["CPT+SFT",0.852,0.854,1.0,1.0],["SFT",0.836,0.838,1.0,1.0],["SFT+GRPO_dense",0.818,0.82,1.0,1.0],["SFT+GRPO_sparse",0.794,0.798,1.0,1.0]]}

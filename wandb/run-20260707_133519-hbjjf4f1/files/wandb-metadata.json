@@ -1,0 +1,43 @@
+{
+  "os": "Linux-6.8.0-1046-nvidia-x86_64-with-glibc2.35",
+  "python": "CPython 3.10.12",
+  "startedAt": "2026-07-07T13:35:19.425417Z",
+  "args": [
+    "--skip-sft"
+  ],
+  "program": "/home/ubuntu/qwen3_math_ft/scripts/run_experiment_lsreasoning.py",
+  "codePath": "scripts/run_experiment_lsreasoning.py",
+  "codePathLocal": "scripts/run_experiment_lsreasoning.py",
+  "git": {
+    "remote": "https://github.com/HiepDema/qwen3_math_ft.git",
+    "commit": "2cd311dee4d7c77ca72de027f2bdfee0eb6ff502"
+  },
+  "email": "nguyenduchiep26112004@gmail.com",
+  "root": "/home/ubuntu/qwen3_math_ft",
+  "host": "192-18-137-160",
+  "executable": "/home/ubuntu/venv/bin/python",
+  "cpu_count": 30,
+  "cpu_count_logical": 30,
+  "gpu": "NVIDIA A10",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "1456701079552",
+      "used": "39919906816"
+    }
+  },
+  "memory": {
+    "total": "238546358272"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA A10",
+      "memoryTotal": "24146608128",
+      "cudaCores": 9216,
+      "architecture": "Ampere",
+      "uuid": "GPU-aa792fed-eeb6-9f50-a54d-36eaa684642d"
+    }
+  ],
+  "cudaVersion": "13.0",
+  "writerId": "l8dvcla1jcfn1ori087wn8znms14kkil"
+}

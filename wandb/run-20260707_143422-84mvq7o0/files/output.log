@@ -1,0 +1,80 @@
+Model: Qwen/Qwen3-0.6B
+Train file: data/lsreasoning_split/train.jsonl
+Output: outputs/sft_lsreasoning
+==((====))==  Unsloth 2026.6.9: Fast Qwen3 patching. Transformers: 5.5.0.
+   \\   /|    NVIDIA A10. Num GPUs = 1. Max memory: 22.058 GB. Platform: Linux.
+O^O/ \_/ \    Torch: 2.12.1+cu130. CUDA: 8.6. CUDA Toolkit: 13.0. Triton: 3.7.1
+\        /    Bfloat16 = TRUE. FA [Xformers = 0.0.35. FA2 = False]
+ "-____-"     Free license: http://github.com/unslothai/unsloth
+Unsloth: Fast downloading is enabled - ignore downloading bars which are red colored!
+Loading weights: 100%|██████████████████████████████████████| 310/310 [00:00<00:00, 1603.30it/s]
+unsloth/qwen3-0.6b-unsloth-bnb-4bit does not have a padding token! Will use pad_token = <|PAD_TOKEN|>.
+Training samples: 12000
+  Train: 11400, Val: 600
+warmup_ratio is deprecated and will be removed in v5.2. Use `warmup_steps` instead.
+Unsloth: Tokenizing ["text"] (num_proc=34): 100%|█| 11400/11400 [00:57<00:00, 199.77 examples/s]
+Unsloth: Packing train dataset (num_proc=34): 100%|█| 11400/11400 [00:01<00:00, 6965.73 examples
+Unsloth: Tokenizing ["text"] (num_proc=34): 100%|██████| 600/600 [00:58<00:00, 10.18 examples/s]
+Unsloth: Packing eval dataset (num_proc=34): 100%|████| 600/600 [00:01<00:00, 357.91 examples/s]
+🦥 Unsloth: Packing enabled - training is >2x faster and uses less VRAM!
+
+Starting SFT...
+  Epochs: 3, LR: 0.0001
+  Effective batch: 16
+The tokenizer has new PAD/BOS/EOS tokens that differ from the model config and generation config. The model config and generation config were aligned accordingly, being updated with the tokenizer's values. Updated tokens: {'bos_token_id': None}.
+==((====))==  Unsloth - 2x faster free finetuning | Num GPUs used = 1
+   \\   /|    Num examples = 1,100 | Num Epochs = 3 | Total steps = 207
+O^O/ \_/ \    Batch size per device = 4 | Gradient accumulation steps = 4
+\        /    Data Parallel GPUs = 1 | Total batch size (4 x 4 x 1) = 16
+ "-____-"     Trainable parameters = 20,185,088 of 616,235,008 (3.28% trained)
+ 48%|███████████████████████████▌                             | 100/207 [03:43<03:52,  2.17s/it]Unsloth: Restored added_tokens_decoder metadata in outputs/sft_lsreasoning/checkpoint-100/tokenizer_config.json.
+
+Unsloth: Will smartly offload gradients to save VRAM!
+Unsloth: Double buffering enabled (parallel H2D + compute) for backward pass.
+{'loss': '3.467', 'grad_norm': '7.27', 'learning_rate': '4.286e-05', 'epoch': '0.1455'}
+{'loss': '1.082', 'grad_norm': '1.399', 'learning_rate': '9.048e-05', 'epoch': '0.2909'}
+{'loss': '0.2935', 'grad_norm': '1.309', 'learning_rate': '9.954e-05', 'epoch': '0.4364'}
+{'loss': '0.1609', 'grad_norm': '0.3412', 'learning_rate': '9.771e-05', 'epoch': '0.5818'}
+{'loss': '0.1546', 'grad_norm': '0.2316', 'learning_rate': '9.451e-05', 'epoch': '0.7273'}
+ 97%|███████████████████████████████████████████████████████  | 200/207 [07:29<00:15,  2.20s/it]Unsloth: Restored added_tokens_decoder metadata in outputs/sft_lsreasoning/checkpoint-200/tokenizer_config.json.
+{'eval_loss': '0.1486', 'eval_runtime': '3.203', 'eval_samples_per_second': '21.23', 'eval_steps_per_second': '5.308', 'epoch': '0.7273'}
+{'loss': '0.1465', 'grad_norm': '0.2193', 'learning_rate': '9.005e-05', 'epoch': '0.8727'}
+{'loss': '0.1471', 'grad_norm': '0.2062', 'learning_rate': '8.445e-05', 'epoch': '1.015'}
+{'loss': '0.1424', 'grad_norm': '0.1403', 'learning_rate': '7.787e-05', 'epoch': '1.16'}
+{'loss': '0.1413', 'grad_norm': '0.1906', 'learning_rate': '7.049e-05', 'epoch': '1.305'}
+{'loss': '0.1402', 'grad_norm': '0.2417', 'learning_rate': '6.253e-05', 'epoch': '1.451'}
+{'eval_loss': '0.1407', 'eval_runtime': '3.202', 'eval_samples_per_second': '21.24', 'eval_steps_per_second': '5.309', 'epoch': '1.451'}
+{'loss': '0.1384', 'grad_norm': '0.1823', 'learning_rate': '5.422e-05', 'epoch': '1.596'}
+{'loss': '0.1403', 'grad_norm': '0.1639', 'learning_rate': '4.578e-05', 'epoch': '1.742'}
+{'loss': '0.1407', 'grad_norm': '0.1533', 'learning_rate': '3.747e-05', 'epoch': '1.887'}
+{'loss': '0.1357', 'grad_norm': '0.1535', 'learning_rate': '2.951e-05', 'epoch': '2.029'}
+{'loss': '0.1354', 'grad_norm': '0.1456', 'learning_rate': '2.213e-05', 'epoch': '2.175'}
+100%|█████████████████████████████████████████████████████████| 207/207 [07:48<00:00,  2.19s/it]Unsloth: Restored added_tokens_decoder metadata in outputs/sft_lsreasoning/checkpoint-207/tokenizer_config.json.
+{'eval_loss': '0.1366', 'eval_runtime': '3.208', 'eval_samples_per_second': '21.2', 'eval_steps_per_second': '5.299', 'epoch': '2.175'}
+{'loss': '0.1354', 'grad_norm': '0.1826', 'learning_rate': '1.555e-05', 'epoch': '2.32'}
+{'loss': '0.1361', 'grad_norm': '0.1616', 'learning_rate': '9.95e-06', 'epoch': '2.465'}
+{'loss': '0.135', 'grad_norm': '0.1362', 'learning_rate': '5.488e-06', 'epoch': '2.611'}
+{'loss': '0.1358', 'grad_norm': '0.1776', 'learning_rate': '2.293e-06', 'epoch': '2.756'}
+{'loss': '0.1344', 'grad_norm': '0.158', 'learning_rate': '4.558e-07', 'epoch': '2.902'}
+{'eval_loss': '0.1358', 'eval_runtime': '3.206', 'eval_samples_per_second': '21.21', 'eval_steps_per_second': '5.302', 'epoch': '2.902'}
+100%|█████████████████████████████████████████████████████████| 207/207 [07:48<00:00,  2.26s/it]
+{'eval_loss': '0.1358', 'eval_runtime': '3.21', 'eval_samples_per_second': '21.18', 'eval_steps_per_second': '5.296', 'epoch': '3'}
+{'train_runtime': '468.7', 'train_samples_per_second': '7.041', 'train_steps_per_second': '0.442', 'train_loss': '0.3545', 'epoch': '3'}
+Unsloth: Restored added_tokens_decoder metadata in outputs/sft_lsreasoning/final/tokenizer_config.json.
+Unsloth: Restored added_tokens_decoder metadata in outputs/sft_lsreasoning/merged/tokenizer_config.json.
+Found HuggingFace hub cache directory: /home/ubuntu/.cache/huggingface/hub
+Checking cache directory for required files...
+Unsloth: Copying 1 files from cache to `outputs/sft_lsreasoning/merged`: 100%|█| 1/1 [00:00<00:0
+Successfully copied all 1 files from cache to `outputs/sft_lsreasoning/merged`
+Checking cache directory for required files...
+Cache check failed: tokenizer.model not found in local cache.
+Not all required files found in cache. Will proceed with downloading.
+Unsloth: Preparing safetensor model files: 100%|███████████████| 1/1 [00:00<00:00, 11037.64it/s]
+Unsloth: Merging weights into 16bit: 100%|████████████████████████| 1/1 [00:02<00:00,  2.25s/it]
+Unsloth: Merge process complete. Saved to `/home/ubuntu/qwen3_math_ft/outputs/sft_lsreasoning/merged`
+100%|███████████████████████████████████████████████████████████| 17/17 [00:03<00:00,  5.21it/s]
+
+SFT Done!
+  Train loss: 0.3545
+  Eval loss: 0.1358
+  Saved: outputs/sft_lsreasoning/final
