@@ -80,16 +80,53 @@ def generate_response(model, tokenizer, question):
     outputs = model.generate(
         **inputs,
         max_new_tokens=256,
-        temperature=0.1,
-        top_p=0.9,
-        do_sample=True,
-        repetition_penalty=1.1,
+        do_sample=False,
     )
     response = tokenizer.decode(
         outputs[0][inputs["input_ids"].shape[1]:],
         skip_special_tokens=True,
     )
     return response.strip()
+
+
+def generate_batch(model, tokenizer, questions, batch_size=16):
+    """Batch generation for faster inference."""
+    all_responses = []
+    tokenizer.padding_side = "left"
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    for i in range(0, len(questions), batch_size):
+        batch_questions = questions[i:i + batch_size]
+        prompts = []
+        for q in batch_questions:
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": q},
+            ]
+            prompts.append(tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            ))
+
+        inputs = tokenizer(
+            prompts, return_tensors="pt", padding=True, truncation=True,
+            max_length=768,
+        ).to(model.device)
+
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=256,
+            do_sample=False,
+        )
+
+        for j, output in enumerate(outputs):
+            prompt_len = inputs["input_ids"][j].ne(tokenizer.pad_token_id).sum()
+            response = tokenizer.decode(
+                output[prompt_len:], skip_special_tokens=True
+            )
+            all_responses.append(response.strip())
+
+    return all_responses
 
 
 def evaluate_model(
@@ -125,6 +162,12 @@ def evaluate_model(
     total = len(test_data)
     print(f"Test samples: {total}")
 
+    # Batch generate all responses
+    questions = [item["question"] for item in test_data]
+    print(f"Generating responses (batch_size=16)...")
+    responses = generate_batch(model, tokenizer, questions, batch_size=16)
+    print(f"Generation complete.")
+
     results = {
         "exact_match": 0,
         "close_match": 0,
@@ -134,12 +177,9 @@ def evaluate_model(
     by_problem_type = {}
     failures = []
 
-    for i, item in enumerate(test_data):
-        question = item["question"]
+    for i, (item, response) in enumerate(zip(test_data, responses)):
         true_answer = item["answer"]
         problem_type = item.get("problem", "unknown")
-
-        response = generate_response(model, tokenizer, question)
 
         pred = extract_number(response)
         true_val = parse_answer(true_answer)
@@ -171,16 +211,14 @@ def evaluate_model(
 
         if not exact and len(failures) < 10:
             failures.append({
-                "question": question[:80],
+                "question": questions[i][:80],
                 "expected": true_answer,
                 "got": str(pred),
             })
 
         if verbose:
             status = "OK" if exact else "X"
-            print(f"  [{i+1:3d}] {status} Q: {question[:60]}  A: {pred} (true: {true_answer})")
-        elif (i + 1) % 50 == 0:
-            print(f"  [{i+1}/{total}] processed...")
+            print(f"  [{i+1:3d}] {status} Q: {questions[i][:60]}  A: {pred} (true: {true_answer})")
 
     # Report
     print(f"\n{'=' * 50}")

@@ -80,8 +80,8 @@ def main():
     parser.add_argument("--grpo-batch-size", type=int, default=4)
     parser.add_argument("--grpo-num-generations", type=int, default=4)
     parser.add_argument("--grpo-beta", type=float, default=0.1)
-    parser.add_argument("--num-eval", type=int, default=None,
-                        help="Number of test samples to evaluate (default: all)")
+    parser.add_argument("--num-eval", type=int, default=500,
+                        help="Number of test samples to evaluate (default: 500, full test ~3000)")
     parser.add_argument("--skip-sft", action="store_true")
     parser.add_argument("--skip-grpo-dense", action="store_true")
     parser.add_argument("--skip-grpo-sparse", action="store_true")
