@@ -186,7 +186,7 @@ def train_grpo(
     print(f"Output: {output_dir}")
 
     # Load model - prefer merged SFT model
-    # Force bfloat16 to avoid Half/BFloat16 mismatch with LoRA adapters
+    # Use float16 to match 4-bit dequantization dtype (avoids Half/BFloat16 mismatch)
     sft_merged = str(Path(sft_path).parent / "merged") if sft_path else None
     if sft_merged and Path(sft_merged).exists():
         print(f"Loading merged SFT model: {sft_merged}")
@@ -194,7 +194,7 @@ def train_grpo(
             model_name=sft_merged,
             max_seq_length=max_seq_length,
             load_in_4bit=True,
-            dtype=torch.bfloat16,
+            dtype=torch.float16,
         )
     elif sft_path and Path(sft_path).exists():
         print(f"Loading SFT adapter: {sft_path}")
@@ -202,7 +202,7 @@ def train_grpo(
             model_name=model_name,
             max_seq_length=max_seq_length,
             load_in_4bit=True,
-            dtype=torch.bfloat16,
+            dtype=torch.float16,
         )
         from peft import PeftModel
         model = PeftModel.from_pretrained(model, sft_path)
@@ -213,7 +213,7 @@ def train_grpo(
             model_name=model_name,
             max_seq_length=max_seq_length,
             load_in_4bit=True,
-            dtype=torch.bfloat16,
+            dtype=torch.float16,
         )
 
     model = FastLanguageModel.get_peft_model(
@@ -279,7 +279,8 @@ def train_grpo(
         weight_decay=0.01,
         warmup_ratio=0.1,
         lr_scheduler_type="cosine",
-        bf16=True,
+        fp16=True,
+        bf16=False,
         logging_steps=10,
         save_steps=100,
         save_total_limit=2,
