@@ -13,6 +13,7 @@ import json
 import re
 from pathlib import Path
 
+import torch
 from datasets import Dataset
 from unsloth import FastLanguageModel
 from trl import GRPOConfig, GRPOTrainer
@@ -185,6 +186,7 @@ def train_grpo(
     print(f"Output: {output_dir}")
 
     # Load model - prefer merged SFT model
+    # Force bfloat16 to avoid Half/BFloat16 mismatch with LoRA adapters
     sft_merged = str(Path(sft_path).parent / "merged") if sft_path else None
     if sft_merged and Path(sft_merged).exists():
         print(f"Loading merged SFT model: {sft_merged}")
@@ -192,7 +194,7 @@ def train_grpo(
             model_name=sft_merged,
             max_seq_length=max_seq_length,
             load_in_4bit=True,
-            dtype=None,
+            dtype=torch.bfloat16,
         )
     elif sft_path and Path(sft_path).exists():
         print(f"Loading SFT adapter: {sft_path}")
@@ -200,7 +202,7 @@ def train_grpo(
             model_name=model_name,
             max_seq_length=max_seq_length,
             load_in_4bit=True,
-            dtype=None,
+            dtype=torch.bfloat16,
         )
         from peft import PeftModel
         model = PeftModel.from_pretrained(model, sft_path)
@@ -211,7 +213,7 @@ def train_grpo(
             model_name=model_name,
             max_seq_length=max_seq_length,
             load_in_4bit=True,
-            dtype=None,
+            dtype=torch.bfloat16,
         )
 
     model = FastLanguageModel.get_peft_model(
