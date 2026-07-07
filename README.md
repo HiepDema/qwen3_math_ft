@@ -1,181 +1,244 @@
-# Qwen3-0.6B Fine-tuning: Math Reasoning (SFT vs GRPO)
+# Fine-tuning Qwen3-0.6B for Math Reasoning
 
-Fine-tune Qwen3-0.6B cho bài toán giải phương trình, so sánh **SFT vs GRPO** với **dense reward vs sparse reward**.
+So sánh 4 phương pháp fine-tuning **Qwen3-0.6B** trên dataset **LSReasoning-15000**:
 
-## Experiments
+| Method | Pipeline | Exact Match |
+|--------|----------|:-----------:|
+| **CPT + SFT** | Base → CPT → SFT | **85.2%** |
+| SFT only | Base → SFT | 83.6% |
+| SFT + GRPO (dense) | Base → SFT → GRPO (4 rewards) | 81.8% |
+| SFT + GRPO (sparse) | Base → SFT → GRPO (binary) | 79.4% |
 
-### Experiment 1: Quadratic Equations (Phương trình bậc 2)
+Full report: [reports/experiment_report.md](reports/experiment_report.md)
 
-Data tự sinh bằng deterministic solver + VietJack crawl (phương trình bậc nhất).
+wandb: [lsreasoning-sft-vs-grpo](https://wandb.ai/hiep26-sdf/lsreasoning-sft-vs-grpo)
 
-| Method | Mô tả |
-|--------|--------|
-| SFT only | Supervised fine-tuning trên 300 samples |
-| GRPO dense | RL với multi-signal reward |
-| GRPO sparse | RL chỉ dùng correctness |
-| SFT → GRPO | SFT trước, GRPO refine |
+---
 
-### Experiment 2: LSReasoning-15000
+## Quick Start
 
-Dataset từ HuggingFace: `DataMuncher-Labs/LSReasoning-15000` (arithmetic, algebra, fractions, word problems).
+### 1. Requirements
 
-| Method | Mô tả |
-|--------|--------|
-| SFT only | Train trên 5000 samples |
-| SFT → GRPO (dense) | 4 reward signals |
-| SFT → GRPO (sparse) | Chỉ đúng/sai |
+- Python 3.10+
+- NVIDIA GPU with >= 16GB VRAM (tested on A10 24GB)
+- CUDA 12.1+
 
-## Dense vs Sparse Reward
+### 2. Installation
 
+```bash
+git clone https://github.com/<your-username>/qwen3-vl-math.git
+cd qwen3-vl-math
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# hoặc: venv\Scripts\activate  # Windows
+
+# Install PyTorch (CUDA 12.1)
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+# Install dependencies
+pip install -r requirements_finetune.txt
+
+# Login wandb (for tracking)
+wandb login
 ```
-Dense Reward = 0.4 × Correctness + 0.2 × Proximity + 0.2 × Format + 0.2 × Reasoning
 
-- Correctness: đáp án đúng/sai (0 hoặc 1)
-- Proximity: đáp án gần đúng được partial credit
-- Format: có "Answer:", có reasoning steps
-- Reasoning: các bước tính toán hợp lệ
+### 3. Run Full Experiment
 
-Sparse Reward = chỉ Correctness (0 hoặc 1)
+```bash
+# Chạy 4 experiments: CPT+SFT, SFT, GRPO dense, GRPO sparse
+python scripts/run_experiment_lsreasoning.py
 ```
 
-Dense cho gradient signal phong phú hơn → model học nhanh hơn, đặc biệt ở giai đoạn đầu khi chưa ra được đáp án đúng.
+Tự động:
+- Download LSReasoning-15000 từ HuggingFace
+- Split 80/20 (train/test) với seed=42
+- Train & eval từng method
+- Log metrics lên wandb
+- In kết quả comparison
 
-## Data Sources
+### 4. Run Individual Steps
 
-| Source | Loại | Mô tả |
-|--------|------|--------|
-| Local generator | Phương trình bậc 2 | 300 samples, deterministic solver |
-| VietJack crawl | Phương trình bậc 1 | Cleaned từ web |
-| LSReasoning-15000 | Math reasoning (EN) | Arithmetic, algebra, fractions, word problems |
+```bash
+# Chỉ CPT
+python scripts/train_cpt_lsreasoning.py --train-file data/lsreasoning_split/train.jsonl
+
+# Chỉ SFT
+python scripts/train_sft_lsreasoning_v2.py --train-file data/lsreasoning_split/train.jsonl
+
+# Chỉ GRPO (cần SFT model đã train)
+python scripts/train_grpo_lsreasoning_v2.py \
+  --train-file data/lsreasoning_split/train.jsonl \
+  --sft-path outputs/sft_lsreasoning/final \
+  --reward-mode dense
+
+# Evaluate bất kỳ model nào
+python scripts/evaluate_lsreasoning_v2.py \
+  --model-path outputs/cpt_sft_lsreasoning/final \
+  --test-file data/lsreasoning_split/test.jsonl
+```
+
+### 5. Skip Steps (nếu đã train)
+
+```bash
+# Skip SFT (đã train xong)
+python scripts/run_experiment_lsreasoning.py --skip-sft
+
+# Chỉ chạy eval (tất cả model đã train)
+python scripts/run_experiment_lsreasoning.py --skip-cpt --skip-sft --skip-grpo-dense --skip-grpo-sparse
+
+# Skip CPT+SFT
+python scripts/run_experiment_lsreasoning.py --skip-cpt
+```
+
+### 6. Inference Optimization (KV Cache Benchmark)
+
+```bash
+python scripts/inference_optimized.py \
+  --model-path outputs/cpt_sft_lsreasoning/final \
+  --benchmark \
+  --num-samples 50 \
+  --output-file outputs/benchmark_results.json
+```
+
+### 7. Export Charts from wandb
+
+```bash
+python scripts/export_wandb_charts.py --entity hiep26-sdf --project lsreasoning-sft-vs-grpo
+```
+
+Saves PNG charts to `reports/figures/`.
+
+---
 
 ## Project Structure
 
 ```
 qwen3-vl-math/
 ├── scripts/
-│   ├── prepare_data.py                # Clean VietJack + sinh quadratic data
-│   ├── generate_quadratic_data.py     # Sinh data phương trình bậc 2
-│   ├── train_sft_quadratic.py         # SFT cho quadratic
-│   ├── train_grpo_quadratic.py        # GRPO cho quadratic (dense/sparse)
-│   ├── evaluate_quadratic.py          # Eval quadratic
-│   ├── run_quadratic_pipeline.py      # Pipeline quadratic
-│   ├── train_sft_lsreasoning.py       # SFT cho LSReasoning-15000
-│   ├── train_grpo_lsreasoning.py      # GRPO cho LSReasoning (dense/sparse)
-│   ├── evaluate_lsreasoning.py        # Eval LSReasoning
-│   └── run_lsreasoning_pipeline.py    # Pipeline LSReasoning (3 experiments)
-├── configs/
-│   ├── sft_quadratic_eq.yaml
-│   └── grpo_quadratic_eq.yaml
-├── data/raw/
-│   ├── cpt_vietjack_crawled.jsonl     # Raw VietJack
-│   ├── sft_vietjack_clean.jsonl       # Cleaned
-│   ├── sft_quadratic_equations.jsonl  # Generated
-│   └── sft_combined.jsonl             # All combined
+│   ├── run_experiment_lsreasoning.py      # Main pipeline (4 experiments)
+│   ├── train_cpt_lsreasoning.py           # CPT training
+│   ├── train_sft_lsreasoning_v2.py        # SFT training
+│   ├── train_grpo_lsreasoning_v2.py       # GRPO training (dense/sparse)
+│   ├── evaluate_lsreasoning_v2.py         # Batch evaluation
+│   ├── inference_optimized.py             # KV Cache benchmark
+│   ├── export_wandb_charts.py             # Download charts from wandb
+│   └── plot_comparison_wandb.py           # Log comparison to wandb
+├── data/
+│   └── lsreasoning_split/
+│       ├── train.jsonl                    # 12,000 samples (auto-generated)
+│       └── test.jsonl                     # 3,000 samples (auto-generated)
 ├── outputs/
-│   ├── sft_quadratic_eq/final/
-│   ├── grpo_quadratic_eq/final/
-│   ├── sft_lsreasoning/final/
-│   ├── grpo_lsreasoning_dense/final/
-│   └── grpo_lsreasoning_sparse/final/
-├── requirements_finetune.txt
-└── pyproject.toml
+│   ├── cpt_lsreasoning/final/            # CPT checkpoint
+│   ├── cpt_sft_lsreasoning/final/        # CPT+SFT checkpoint
+│   ├── sft_lsreasoning/final/            # SFT checkpoint
+│   ├── grpo_lsreasoning_dense/final/     # GRPO dense checkpoint
+│   ├── grpo_lsreasoning_sparse/final/    # GRPO sparse checkpoint
+│   ├── experiment_results.json            # Final metrics
+│   └── benchmark_results.json             # KV Cache results
+├── reports/
+│   ├── experiment_report.md               # Full report
+│   └── figures/                           # Charts (from export script)
+├── .github/workflows/
+│   └── lsreasoning_experiment.yml         # CI/CD pipeline
+├── requirements_finetune.txt              # Dependencies
+└── README.md
 ```
 
-## How to Run
+---
 
-### Installation
+## Dataset
 
-```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu121
-pip install -r requirements_finetune.txt
+**LSReasoning-15000** ([HuggingFace](https://huggingface.co/datasets/DataMuncher-Labs/LSReasoning-15000))
+
+| Property | Value |
+|----------|-------|
+| Size | 15,000 samples |
+| Split | 80% train / 20% test (seed=42) |
+| Language | English |
+| Types | Arithmetic, linear equations, two-step equations, fractions, exponents, algebra, inequalities |
+
+Sample:
+```json
+{
+  "question": "Solve for x: 3x + 7 = 22",
+  "problem": "Solve the linear equation.",
+  "how_to_solve": "Subtract 7 from both sides to get 3x = 15, then divide by 3.",
+  "answer": "5"
+}
 ```
 
-### Pipeline 1: Quadratic Equations
+---
 
-```bash
-# So sánh tất cả methods (SFT / GRPO dense / GRPO sparse / SFT+GRPO)
-python scripts/run_quadratic_pipeline.py --method compare
+## Training Configuration
 
-# Hoặc chỉ SFT → GRPO
-python scripts/run_quadratic_pipeline.py
+| Parameter | CPT | SFT | GRPO |
+|-----------|:---:|:---:|:----:|
+| Base model | Qwen3-0.6B | Qwen3-0.6B / CPT merged | SFT merged |
+| Data | ~12,500 plain text | 12,000 chat pairs | 1,000 prompts × 4 generations |
+| Epochs | 2 | 3 | 1 |
+| Learning rate | 2e-4 | 1e-4 | 5e-6 |
+| LoRA r / alpha | 16 / 32 | 32 / 64 | 16 / 32 |
+| Effective batch | 16 | 16 | 8 |
+| Quantization | 4-bit QLoRA | 4-bit QLoRA | 4-bit QLoRA |
+| Precision | fp16 | fp16 | fp16 |
+| Optimizer | adamw_8bit | adamw_8bit | adamw_8bit |
+
+---
+
+## Reward Functions (GRPO)
+
+### Dense Reward
+```
+R = 0.4 × Correctness + 0.2 × Proximity + 0.2 × Format + 0.2 × Reasoning
+```
+- **Correctness**: exact answer match (0 or 1)
+- **Proximity**: partial credit based on relative error (0 to 1)
+- **Format**: has "Answer:", multi-line reasoning, math operators (0 to 1)
+- **Reasoning**: keyword overlap with reference approach (0 to 1)
+
+### Sparse Reward
+```
+R = Correctness (0 or 1)
 ```
 
-### Pipeline 2: LSReasoning-15000 (Recommended)
+---
 
-```bash
-# Chạy full: SFT → eval → GRPO dense → eval → GRPO sparse → eval
-python scripts/run_lsreasoning_pipeline.py
+## Key Findings
 
-# Tuỳ chỉnh
-python scripts/run_lsreasoning_pipeline.py --max-samples 5000 --max-prompts 3000 --num-tests 200
-```
+1. **CPT+SFT wins** (85.2%) — domain pre-training improves downstream SFT
+2. **GRPO does not help** at 0.6B scale with high SFT baseline (83.6%)
+3. **Dense > Sparse** within GRPO, but both underperform SFT
+4. **Two-step equations** are the key differentiator between methods
+5. **Static KV Cache** gives 1.04x inference speedup
 
-### Chạy từng bước (LSReasoning)
+---
 
-```bash
-# 1. SFT
-python scripts/train_sft_lsreasoning.py --max-samples 5000 --epochs 3
+## Estimated Training Time (A10 24GB)
 
-# 2. GRPO dense reward
-python scripts/train_grpo_lsreasoning.py --sft-path outputs/sft_lsreasoning/final --reward-mode dense
+| Stage | Time |
+|-------|:----:|
+| CPT | ~15 min |
+| SFT | ~30 min |
+| GRPO (×2) | ~15 min each |
+| Eval (×4) | ~5 min each |
+| **Total** | **~2 hours** |
 
-# 3. GRPO sparse reward
-python scripts/train_grpo_lsreasoning.py --sft-path outputs/sft_lsreasoning/final --reward-mode sparse
+---
 
-# 4. Evaluate
-python scripts/evaluate_lsreasoning.py --model-path outputs/sft_lsreasoning/final --verbose
-python scripts/evaluate_lsreasoning.py --model-path outputs/grpo_lsreasoning_dense/final --verbose
-python scripts/evaluate_lsreasoning.py --model-path outputs/grpo_lsreasoning_sparse/final --verbose
-```
+## CI/CD
 
-## Training Config
+GitHub Actions workflow at `.github/workflows/lsreasoning_experiment.yml`:
+- **validate**: syntax check + reward function unit tests
+- **prepare-data**: download + split dataset
+- **train**: full experiment on self-hosted GPU runner
+- Auto-comments results on PRs
 
-| Parameter | SFT | GRPO |
-|-----------|-----|------|
-| Base model | Qwen/Qwen3-0.6B | SFT checkpoint |
-| LoRA rank | 32 | 16 |
-| LoRA alpha | 64 | 32 |
-| Learning rate | 1e-4 | 5e-6 |
-| Epochs | 3 (LSR) / 5 (quad) | 1 |
-| Effective batch size | 16 | 8 |
-| Quantization | 4-bit QLoRA | 4-bit QLoRA |
-| Num generations | - | 4 per prompt |
-| KL beta | - | 0.1 |
-| Packing | Yes (SFT) | N/A |
+Trigger manually via `workflow_dispatch` or on push to training scripts.
 
-## Expected Results
+---
 
-### LSReasoning-15000
+## License
 
-| Method | Exact Match | Format | Notes |
-|--------|-------------|--------|-------|
-| SFT only | ~45-55% | ~70% | Baseline |
-| SFT → GRPO (sparse) | ~50-60% | ~60% | Chỉ reward đúng/sai |
-| SFT → GRPO (dense) | ~60-70% | ~85% | Multi-signal reward |
-
-### Quadratic Equations
-
-| Method | Answer Correct | Delta | Format |
-|--------|---------------|-------|--------|
-| SFT only | ~75% | ~85% | ~88% |
-| GRPO sparse only | ~60% | ~70% | ~50% |
-| GRPO dense only | ~70% | ~80% | ~75% |
-| SFT → GRPO dense | ~88% | ~92% | ~90% |
-
-### Key Findings
-
-- **Dense > Sparse**: Dense reward cho partial credit, model nhận feedback ngay cả khi chưa đúng hoàn toàn
-- **SFT → GRPO > GRPO alone**: SFT cung cấp format & knowledge base, GRPO refine reasoning
-- **Format reward quan trọng**: Sparse GRPO có thể làm giảm format quality vì chỉ optimize cho đáp án đúng
-
-## Tech Stack
-
-| Component | Tools |
-|-----------|-------|
-| Base Model | Qwen/Qwen3-0.6B |
-| Dataset | LSReasoning-15000, VietJack, Local Gen |
-| Training | Unsloth + TRL (SFTTrainer, GRPOTrainer) |
-| RL Method | GRPO (dense / sparse reward) |
-| LoRA | PEFT, 4-bit QLoRA |
-| GPU | NVIDIA A10 (24GB) / T4 (16GB) |
-| Eval | Exact Match, Format Score, by Problem Type |
+MIT
