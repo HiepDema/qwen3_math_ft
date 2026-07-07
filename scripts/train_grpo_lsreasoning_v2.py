@@ -149,6 +149,7 @@ def train_grpo(
     output_dir: str = "outputs/grpo_lsreasoning_dense",
     reward_mode: str = "dense",
     max_seq_length: int = 1024,
+    max_prompts: int = 3000,
     epochs: int = 1,
     lr: float = 5e-6,
     batch_size: int = 4,
@@ -230,8 +231,12 @@ def train_grpo(
         random_state=seed,
     )
 
-    # Load training data
+    # Load training data (subset for GRPO - doesn't need all SFT data)
     raw_data = load_jsonl(train_file)
+    if max_prompts and max_prompts < len(raw_data):
+        import random
+        random.seed(seed)
+        raw_data = random.sample(raw_data, max_prompts)
     print(f"Training prompts: {len(raw_data)}")
 
     # Build prompt dataset + metadata
@@ -330,6 +335,8 @@ def main():
     parser.add_argument("--output-dir", type=str, default=None)
     parser.add_argument("--reward-mode", choices=["dense", "sparse"], default="dense")
     parser.add_argument("--max-seq-length", type=int, default=1024)
+    parser.add_argument("--max-prompts", type=int, default=3000,
+                        help="Max prompts for GRPO (default 3000, full train ~12000)")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--lr", type=float, default=5e-6)
     parser.add_argument("--batch-size", type=int, default=4)
@@ -350,6 +357,7 @@ def main():
         output_dir=args.output_dir,
         reward_mode=args.reward_mode,
         max_seq_length=args.max_seq_length,
+        max_prompts=args.max_prompts,
         epochs=args.epochs,
         lr=args.lr,
         batch_size=args.batch_size,
