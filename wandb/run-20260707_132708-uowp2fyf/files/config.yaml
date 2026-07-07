@@ -1,0 +1,78 @@
+_wandb:
+    value:
+        cli_version: 0.28.0
+        e:
+            5hi2mypckx35dvi4m9tl422ci0m9kbf7:
+                codePath: scripts/run_experiment_lsreasoning.py
+                codePathLocal: scripts/run_experiment_lsreasoning.py
+                cpu_count: 30
+                cpu_count_logical: 30
+                cudaVersion: "13.0"
+                disk:
+                    /:
+                        total: "1456701079552"
+                        used: "39896121344"
+                email: nguyenduchiep26112004@gmail.com
+                executable: /home/ubuntu/venv/bin/python
+                git:
+                    commit: 21f9a6b53582b08e52ddc732799bda7529fb205c
+                    remote: https://github.com/HiepDema/qwen3_math_ft.git
+                gpu: NVIDIA A10
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 9216
+                      memoryTotal: "24146608128"
+                      name: NVIDIA A10
+                      uuid: GPU-aa792fed-eeb6-9f50-a54d-36eaa684642d
+                host: 192-18-137-160
+                memory:
+                    total: "238546358272"
+                os: Linux-6.8.0-1046-nvidia-x86_64-with-glibc2.35
+                program: /home/ubuntu/qwen3_math_ft/scripts/run_experiment_lsreasoning.py
+                python: CPython 3.10.12
+                root: /home/ubuntu/qwen3_math_ft
+                startedAt: "2026-07-07T13:27:08.858600Z"
+                writerId: 5hi2mypckx35dvi4m9tl422ci0m9kbf7
+        m: []
+        python_version: 3.10.12
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 51
+                - 53
+                - 71
+                - 75
+                - 84
+                - 98
+            "2":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 51
+                - 53
+                - 71
+                - 75
+                - 84
+                - 98
+            "3":
+                - 2
+                - 13
+                - 16
+            "4": 3.10.12
+            "5": 0.28.0
+            "6": 5.5.0
+            "10":
+                - 20
+            "12": 0.28.0
+            "13": linux-x86_64
+method:
+    value: SFT
+model_path:
+    value: outputs/sft_lsreasoning/final
+num_eval:
+    value: 500

@@ -1,0 +1,201 @@
+Reward mode: dense
+SFT path: outputs/sft_lsreasoning/final
+Train file: data/lsreasoning_split/train.jsonl
+Output: outputs/grpo_lsreasoning_dense
+Loading merged SFT model: outputs/sft_lsreasoning/merged
+==((====))==  Unsloth 2026.6.9: Fast Qwen3 patching. Transformers: 5.5.0.
+   \\   /|    NVIDIA A10. Num GPUs = 1. Max memory: 22.058 GB. Platform: Linux.
+O^O/ \_/ \    Torch: 2.12.1+cu130. CUDA: 8.6. CUDA Toolkit: 13.0. Triton: 3.7.1
+\        /    Bfloat16 = TRUE. FA [Xformers = 0.0.35. FA2 = False]
+ "-____-"     Free license: http://github.com/unslothai/unsloth
+Unsloth: Fast downloading is enabled - ignore downloading bars which are red colored!
+Loading weights:   0%|                                                  | 0/310 [00:00<?, ?it/s]/home/ubuntu/venv/lib/python3.10/site-packages/bitsandbytes/backends/cuda/ops.py:213: FutureWarning: _check_is_size will be removed in a future PyTorch release along with guard_size_oblivious.     Use _check(i >= 0) instead.
+  torch._check_is_size(blocksize)
+Loading weights: 100%|██████████████████████████████████████| 310/310 [00:00<00:00, 1099.92it/s]
+The tokenizer you are loading from 'outputs/sft_lsreasoning/merged' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+The tokenizer you are loading from 'outputs/sft_lsreasoning/merged' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+Unsloth 2026.6.9 patched 28 layers with 28 QKV layers, 28 O layers and 28 MLP layers.
+Training prompts: 12000
+warmup_ratio is deprecated and will be removed in v5.2. Use `warmup_steps` instead.
+
+Starting GRPO (dense)...
+  Prompts: 12000
+  Generations/prompt: 4
+  LR: 5e-06, Beta: 0.1
+==((====))==  Unsloth - 2x faster free finetuning | Num GPUs used = 1
+   \\   /|    Num examples = 12,000 | Num Epochs = 1 | Total steps = 6,000
+O^O/ \_/ \    Batch size per device = 4 | Gradient accumulation steps = 2
+\        /    Data Parallel GPUs = 1 | Total batch size (4 x 2 x 1) = 8
+ "-____-"     Trainable parameters = 10,092,544 of 606,142,464 (1.67% trained)
+  0%|                                                                  | 0/6000 [00:00<?, ?it/s]Passing `generation_config` together with generation-related arguments=({'cache_implementation', 'disable_compile', 'pad_token_id'}) is deprecated and will be removed in future versions. Please pass either a `generation_config` object OR all generation parameters explicitly, but not both.
+Both `max_new_tokens` (=256) and `max_length`(=40960) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+/home/ubuntu/venv/lib/python3.10/site-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/home/ubuntu/venv/lib/python3.10/site-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/home/ubuntu/venv/lib/python3.10/site-packages/transformers/modeling_attn_mask_utils.py:172: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/home/ubuntu/venv/lib/python3.10/site-packages/transformers/modeling_attn_mask_utils.py:202: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+/home/ubuntu/venv/lib/python3.10/site-packages/transformers/modeling_attn_mask_utils.py:254: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+Traceback (most recent call last):
+  File "/home/ubuntu/qwen3_math_ft/scripts/run_experiment_lsreasoning.py", line 209, in <module>
+    main()
+  File "/home/ubuntu/qwen3_math_ft/scripts/run_experiment_lsreasoning.py", line 137, in main
+    run_step("GRPO Training (Dense Reward)", train_grpo,
+  File "/home/ubuntu/qwen3_math_ft/scripts/run_experiment_lsreasoning.py", line 63, in run_step
+    result = func(*args, **kwargs)
+  File "/home/ubuntu/qwen3_math_ft/scripts/train_grpo_lsreasoning_v2.py", line 307, in train_grpo
+    train_result = trainer.train()
+  File "/home/ubuntu/qwen3_math_ft/unsloth_compiled_cache/UnslothGRPOTrainer.py", line 101, in wrapper
+    output = f(self, *args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/rl.py", line 143, in _unsloth_train_with_resume_guard
+    return original_train(self, *args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/transformers/trainer.py", line 1424, in train
+    return inner_training_loop(
+  File "<string>", line 87, in _fast_inner_training_loop
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/transformers/trainer.py", line 1734, in _run_epoch
+    tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
+  File "<string>", line 40, in _unsloth_training_step
+  File "/home/ubuntu/qwen3_math_ft/unsloth_compiled_cache/UnslothGRPOTrainer.py", line 4407, in compute_loss
+    ) = grpo_accumulated_loss(
+  File "/home/ubuntu/qwen3_math_ft/unsloth_compiled_cache/UnslothGRPOTrainer.py", line 1127, in grpo_accumulated_loss
+    new_hidden_states_chunk = unwrapped_model(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/llama.py", line 1608, in PeftModel_fast_forward
+    return self.base_model(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/peft/tuners/tuners_utils.py", line 330, in forward
+    return self.model.forward(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/rl.py", line 708, in wrapped_forward
+    outputs = original_forward(*args, **forward_kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/llama.py", line 1409, in _CausalLM_fast_forward
+    outputs = self.model(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/llama.py", line 1191, in LlamaModel_fast_forward
+    layer_outputs = decoder_layer(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/transformers/modeling_layers.py", line 92, in __call__
+    return self._gradient_checkpointing_func(partial(super().__call__, **kwargs), *args)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/_compile.py", line 54, in inner
+    return disable_fn(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1298, in _fn
+    return fn(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth_zoo/gradient_checkpointing.py", line 812, in unsloth_checkpoint
+    return UnslothCheckpointFunction.apply(function, preserve, *args)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/autograd/function.py", line 596, in apply
+    return super().apply(*args, **kwargs)  # type: ignore[misc]
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth_zoo/gradient_checkpointing.py", line 603, in forward
+    outputs = run_function(*args)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/llama.py", line 819, in LlamaDecoderLayer_fast_forward
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/qwen3.py", line 97, in Qwen3Attention_fast_forward
+    Q, K, V = self.apply_qkv(self, hidden_states)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/kernels/fast_lora.py", line 552, in apply_lora_qkv
+    Q, K, V = LoRA_QKV.apply(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/autograd/function.py", line 596, in apply
+    return super().apply(*args, **kwargs)  # type: ignore[misc]
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/amp/autocast_mode.py", line 493, in decorate_fwd
+    return fwd(*args, **kwargs)  # pyrefly: ignore [not-callable]
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/kernels/fast_lora.py", line 397, in forward
+    Q = matmul_lora(X_for_matmul, QW, QW_quant, QA, QB, QS)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/kernels/utils.py", line 1107, in matmul_lora
+    out.addmm_(XA, B.to(dtype), alpha = s)
+RuntimeError: self and mat2 must have the same dtype, but got Half and BFloat16
+Traceback (most recent call last):
+  File "/home/ubuntu/qwen3_math_ft/scripts/run_experiment_lsreasoning.py", line 209, in <module>
+    main()
+  File "/home/ubuntu/qwen3_math_ft/scripts/run_experiment_lsreasoning.py", line 137, in main
+    run_step("GRPO Training (Dense Reward)", train_grpo,
+  File "/home/ubuntu/qwen3_math_ft/scripts/run_experiment_lsreasoning.py", line 63, in run_step
+    result = func(*args, **kwargs)
+  File "/home/ubuntu/qwen3_math_ft/scripts/train_grpo_lsreasoning_v2.py", line 307, in train_grpo
+    train_result = trainer.train()
+  File "/home/ubuntu/qwen3_math_ft/unsloth_compiled_cache/UnslothGRPOTrainer.py", line 101, in wrapper
+    output = f(self, *args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/rl.py", line 143, in _unsloth_train_with_resume_guard
+    return original_train(self, *args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/transformers/trainer.py", line 1424, in train
+    return inner_training_loop(
+  File "<string>", line 87, in _fast_inner_training_loop
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/transformers/trainer.py", line 1734, in _run_epoch
+    tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
+  File "<string>", line 40, in _unsloth_training_step
+  File "/home/ubuntu/qwen3_math_ft/unsloth_compiled_cache/UnslothGRPOTrainer.py", line 4407, in compute_loss
+    ) = grpo_accumulated_loss(
+  File "/home/ubuntu/qwen3_math_ft/unsloth_compiled_cache/UnslothGRPOTrainer.py", line 1127, in grpo_accumulated_loss
+    new_hidden_states_chunk = unwrapped_model(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/llama.py", line 1608, in PeftModel_fast_forward
+    return self.base_model(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/peft/tuners/tuners_utils.py", line 330, in forward
+    return self.model.forward(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/rl.py", line 708, in wrapped_forward
+    outputs = original_forward(*args, **forward_kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/llama.py", line 1409, in _CausalLM_fast_forward
+    outputs = self.model(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/llama.py", line 1191, in LlamaModel_fast_forward
+    layer_outputs = decoder_layer(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/transformers/modeling_layers.py", line 92, in __call__
+    return self._gradient_checkpointing_func(partial(super().__call__, **kwargs), *args)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/_compile.py", line 54, in inner
+    return disable_fn(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1298, in _fn
+    return fn(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth_zoo/gradient_checkpointing.py", line 812, in unsloth_checkpoint
+    return UnslothCheckpointFunction.apply(function, preserve, *args)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/autograd/function.py", line 596, in apply
+    return super().apply(*args, **kwargs)  # type: ignore[misc]
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth_zoo/gradient_checkpointing.py", line 603, in forward
+    outputs = run_function(*args)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/llama.py", line 819, in LlamaDecoderLayer_fast_forward
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1778, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1789, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/models/qwen3.py", line 97, in Qwen3Attention_fast_forward
+    Q, K, V = self.apply_qkv(self, hidden_states)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/kernels/fast_lora.py", line 552, in apply_lora_qkv
+    Q, K, V = LoRA_QKV.apply(
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/autograd/function.py", line 596, in apply
+    return super().apply(*args, **kwargs)  # type: ignore[misc]
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/torch/amp/autocast_mode.py", line 493, in decorate_fwd
+    return fwd(*args, **kwargs)  # pyrefly: ignore [not-callable]
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/kernels/fast_lora.py", line 397, in forward
+    Q = matmul_lora(X_for_matmul, QW, QW_quant, QA, QB, QS)
+  File "/home/ubuntu/venv/lib/python3.10/site-packages/unsloth/kernels/utils.py", line 1107, in matmul_lora
+    out.addmm_(XA, B.to(dtype), alpha = s)
+RuntimeError: self and mat2 must have the same dtype, but got Half and BFloat16
