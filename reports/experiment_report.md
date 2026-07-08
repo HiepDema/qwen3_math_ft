@@ -233,21 +233,84 @@ Reinforcement learning stage that generates multiple completions per prompt and 
 #### Dense Reward (Multi-Signal)
 
 ```
-R_dense = 0.4 × Correctness + 0.2 × Proximity + 0.2 × Format + 0.2 × Reasoning
+R_dense = 0.4 × R_correctness + 0.2 × R_proximity + 0.2 × R_format + 0.2 × R_reasoning
 ```
 
-| Component | Description | Range |
-|-----------|-------------|-------|
-| Correctness | Exact match of extracted answer | {0, 1} |
-| Proximity | Partial credit based on relative error | [0, 1] |
-| Format | Has "Answer:", multi-line, reasoning keywords, math operators | [0, 1] |
-| Reasoning | Keyword overlap with reference approach + math expressions | [0, 1] |
+**R_correctness** (binary):
+```
+R_correctness = 1.0  if |predicted - true| < 1e-6
+                0.0  otherwise
+```
+Trích xuất số từ response bằng regex: tìm pattern `Answer: <number>`, fallback lấy số cuối cùng. Hỗ trợ int, float, fraction (`3/4` → 0.75).
+
+**R_proximity** (continuous):
+```
+R_proximity = 1.0                                      if exact match
+              max(0, 1 - |predicted|)                  if true = 0
+              max(0, 1 - |predicted - true| / max(|true|, 1))   otherwise
+```
+Partial credit dựa trên relative error — đáp án gần đúng vẫn nhận reward.
+
+**R_format** (additive, cap 1.0):
+```
+R_format  = +0.3  if "Answer:" or "answer:" in response
+            +0.3  if response has >= 3 non-empty lines
+            +0.2  if contains reasoning words ("step", "solve", "approach", "therefore", "thus")
+            +0.2  if contains math operators (=, +, -, *, /)
+```
+
+**R_reasoning** (additive, cap 1.0):
+```
+R_reasoning = +0.15 per keyword match with how_to_solve (max +0.5)
+              +0.3  if response contains math operators
+              +0.2  if response contains numeric computation pattern (e.g. "3x = 15")
+```
+Chỉ count keyword > 3 ký tự để tránh noise từ stopwords.
 
 #### Sparse Reward (Binary)
 
 ```
-R_sparse = Correctness (0 or 1)
+R_sparse = R_correctness (0 or 1)
 ```
+
+Chỉ dùng đúng/sai, không partial credit, không reward format hay reasoning.
+
+#### Ví dụ so sánh Dense vs Sparse
+
+Câu hỏi: `3x + 7 = 22`, đáp án đúng: `5`
+
+**Case 1** — Model trả lời đúng + có reasoning:
+```
+"Step 1: subtract 7 from both sides
+3x = 15
+Divide by 3
+Answer: 5"
+```
+
+| Component | Score |
+|-----------|:-----:|
+| Correctness | 1.0 |
+| Proximity | 1.0 |
+| Format | 1.0 |
+| Reasoning | 0.8 |
+| **R_dense** | **0.96** |
+| **R_sparse** | **1.0** |
+
+**Case 2** — Model trả lời sai nhưng gần đúng:
+```
+"Answer: 4"
+```
+
+| Component | Score |
+|-----------|:-----:|
+| Correctness | 0.0 |
+| Proximity | 0.8 |
+| Format | 0.3 |
+| Reasoning | 0.0 |
+| **R_dense** | **0.22** |
+| **R_sparse** | **0.0** |
+
+Dense reward cho gradient signal (0.22) ngay cả khi sai → model biết đang đi đúng hướng. Sparse cho 0 → model không phân biệt được sai xa hay sai gần.
 
 ### 3.5 Design Patterns
 
