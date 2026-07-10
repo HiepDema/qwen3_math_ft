@@ -1,13 +1,22 @@
 # Fine-tuning Qwen3-0.6B for Math Reasoning
 
-So sánh 4 phương pháp fine-tuning **Qwen3-0.6B** trên dataset **LSReasoning-15000**:
+So sánh **6 phương pháp** fine-tuning **Qwen3-0.6B** trên dataset **LSReasoning-15000**:
 
-| Method | Pipeline | Exact Match |
-|--------|----------|:-----------:|
-| **CPT + SFT** | Base → CPT → SFT | **85.2%** |
-| SFT only | Base → SFT | 83.6% |
-| SFT + GRPO (dense) | Base → SFT → GRPO (4 rewards) | 81.8% |
-| SFT + GRPO (sparse) | Base → SFT → GRPO (binary) | 79.4% |
+| # | Method | Pipeline | Exact Match |
+|---|--------|----------|:-----------:|
+| 1 | **CPT + SFT** | Base → CPT → SFT | **85.2%** |
+| 2 | SFT only | Base → SFT | 83.6% |
+| 3 | SFT + GRPO (dense) | Base → SFT → GRPO (4 rewards) | 81.8% |
+| 4 | CPT + SFT + GRPO (dense) | Base → CPT → SFT → GRPO (4 rewards) | 80.4% |
+| 5 | SFT + GRPO (sparse) | Base → SFT → GRPO (binary) | 79.4% |
+| 6 | CPT + SFT + GRPO (sparse) | Base → CPT → SFT → GRPO (binary) | 78.4% |
+
+### Key Findings
+
+- **CPT+SFT wins** — domain pre-training + instruction tuning là pipeline tối ưu cho model nhỏ
+- **GRPO luôn làm giảm performance** ở scale 0.6B, bất kể base model là SFT hay CPT+SFT
+- **Model càng tốt, GRPO càng phá**: CPT+SFT bị mất −4.8% (dense) / −6.8% (sparse) khi thêm GRPO
+- **Dense > Sparse** (~2% gap) nhưng cả hai đều kém hơn không dùng GRPO
 
 Full report: [reports/experiment_report.md](reports/experiment_report.md)
 
@@ -175,7 +184,7 @@ Sample:
 
 | Parameter | CPT | SFT | GRPO |
 |-----------|:---:|:---:|:----:|
-| Base model | Qwen3-0.6B | Qwen3-0.6B / CPT merged | SFT merged |
+| Base model | Qwen3-0.6B | Qwen3-0.6B / CPT merged | SFT merged / CPT+SFT merged |
 | Data | ~12,500 plain text | 12,000 chat pairs | 1,000 prompts × 4 generations |
 | Epochs | 2 | 3 | 1 |
 | Learning rate | 2e-4 | 1e-4 | 5e-6 |
@@ -207,11 +216,12 @@ R = Correctness (0 or 1)
 
 ## Key Findings
 
-1. **CPT+SFT wins** (85.2%) — domain pre-training improves downstream SFT
-2. **GRPO does not help** at 0.6B scale with high SFT baseline (83.6%)
-3. **Dense > Sparse** within GRPO, but both underperform SFT
-4. **Two-step equations** are the key differentiator between methods
-5. **Static KV Cache** gives 1.04x inference speedup
+1. **CPT+SFT wins** (85.2%) — 2-stage pipeline is optimal for 0.6B model
+2. **GRPO always hurts** at this scale — cả 4 GRPO variants đều kém hơn base model tương ứng
+3. **Model càng tốt, GRPO càng phá** — CPT+SFT mất −4.8%/−6.8%, SFT chỉ mất −1.8%/−4.2%
+4. **Dense > Sparse** (~2% gap), nhưng cả hai đều gây degradation
+5. **Two-step equations & linear equations** là differentiator chính giữa các methods
+6. **More stages ≠ Better results** — 3-stage (CPT+SFT+GRPO) kém hơn 2-stage (CPT+SFT)
 
 ---
 
@@ -220,10 +230,10 @@ R = Correctness (0 or 1)
 | Stage | Time |
 |-------|:----:|
 | CPT | ~15 min |
-| SFT | ~30 min |
-| GRPO (×2) | ~15 min each |
-| Eval (×4) | ~5 min each |
-| **Total** | **~2 hours** |
+| SFT (×2: standalone + on CPT) | ~30 min each |
+| GRPO (×4: dense/sparse × SFT/CPT+SFT) | ~15 min each |
+| Eval (×6 models) | ~30 min total |
+| **Total** | **~2.5 hours** |
 
 ---
 

@@ -523,6 +523,42 @@ With only 1000 prompts × 4 generations × 1 epoch, the RL stage may not have su
 
 The dense reward's proximity and reasoning components may introduce noise. For example, a wrong answer that is numerically close to the correct one receives partial credit, potentially reinforcing incorrect reasoning paths. Even dense reward cannot prevent the overall degradation — it only mitigates it (~2% better than sparse).
 
+### 6.6 Summary: What Each Stage Actually Does
+
+| Stage | Effect on 0.6B Model | Evidence |
+|-------|---------------------|----------|
+| **CPT** | Injects math vocabulary & patterns into base weights | CPT+SFT (85.2%) > SFT (83.6%) on same data |
+| **SFT** | Teaches instruction following + structured output | 83.6% from base, 100% format compliance |
+| **GRPO** | Explores alternative solutions via reward signal | −1.8% to −6.8% degradation across all variants |
+
+The core issue: at 0.6B scale, the model's capacity is a **zero-sum game**. GRPO's exploration forces the model to allocate capacity to reward-hacking strategies (producing answers that score well on proximity/format) at the expense of precise reasoning learned during SFT.
+
+### 6.7 Practical Interpretation
+
+The 6 experiments paint a clear picture of how training pipeline depth interacts with model scale:
+
+```
+Accuracy vs Pipeline Depth (Qwen3-0.6B):
+
+  85.2% ─── CPT+SFT ●
+  83.6% ─── SFT ●
+  81.8% ─── SFT+GRPO(dense) ●
+  80.4% ─── CPT+SFT+GRPO(dense) ●
+  79.4% ─── SFT+GRPO(sparse) ●
+  78.4% ─── CPT+SFT+GRPO(sparse) ●
+
+  More stages ≠ Better results (at this scale)
+```
+
+**Why CPT helps but GRPO hurts:**
+- CPT is **additive** — it adds domain knowledge without conflicting with later SFT training
+- GRPO is **adversarial** — it actively modifies weights to maximize reward, which can override SFT-learned patterns
+- At 0.6B parameters, the model cannot simultaneously maintain SFT knowledge AND incorporate RL updates
+
+**Why dense > sparse (but both still hurt):**
+- Dense reward gives gradient signal even for wrong answers → smoother optimization → less catastrophic forgetting
+- Sparse reward only gives signal on exact matches → noisy gradients → more aggressive weight updates → more forgetting
+
 ---
 
 ## 7. Inference Optimization
