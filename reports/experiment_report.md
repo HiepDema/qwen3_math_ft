@@ -1,16 +1,18 @@
 # Experiment Report: Fine-tuning Qwen3-0.6B for Math Reasoning
-## Comparing CPT+SFT, SFT, SFT+GRPO (Dense), SFT+GRPO (Sparse)
+## Comparing 6 Training Pipelines: CPT+SFT, SFT, GRPO (Dense/Sparse)
 
 ---
 
 ## 1. Introduction
 
-This report presents results from a comparative study of four fine-tuning strategies applied to **Qwen3-0.6B** (600M parameters) for elementary math reasoning tasks. The goal is to determine the most effective training pipeline among:
+This report presents results from a comparative study of **six fine-tuning strategies** applied to **Qwen3-0.6B** (600M parameters) for elementary math reasoning tasks. The goal is to determine the most effective training pipeline among:
 
 1. **CPT + SFT** — Continued Pre-Training on domain text, then Supervised Fine-Tuning
 2. **SFT only** — Direct Supervised Fine-Tuning from base model
 3. **SFT + GRPO (Dense Reward)** — SFT followed by RL with multi-signal reward
 4. **SFT + GRPO (Sparse Reward)** — SFT followed by RL with binary correctness reward
+5. **CPT + SFT + GRPO (Dense Reward)** — Full pipeline: CPT then SFT then RL with dense reward
+6. **CPT + SFT + GRPO (Sparse Reward)** — Full pipeline: CPT then SFT then RL with sparse reward
 
 All experiments use the same dataset split and evaluation protocol for fair comparison.
 
@@ -410,9 +412,11 @@ So sánh SFT loss giữa 2 pipelines:
 | **CPT + SFT** | **85.2%** | **85.4%** | 100% | 100% |
 | SFT only | 83.6% | 83.8% | 100% | 100% |
 | SFT + GRPO (dense) | 81.8% | 82.0% | 100% | 100% |
+| CPT + SFT + GRPO (dense) | 80.4% | 80.4% | 100% | 100% |
 | SFT + GRPO (sparse) | 79.4% | 79.8% | 100% | 100% |
+| CPT + SFT + GRPO (sparse) | 78.4% | 78.4% | 100% | 100% |
 
-**Winner: CPT + SFT** with 85.2% exact match, outperforming all other methods.
+**Winner: CPT + SFT** with 85.2% exact match, outperforming all other methods including the full 3-stage pipeline.
 
 ![Evaluation Comparison](figures/eval_comparison.png)
 
@@ -420,47 +424,68 @@ So sánh SFT loss giữa 2 pipelines:
 
 ![Accuracy by Problem Type](figures/accuracy_by_type.png)
 
-| Problem Type | CPT+SFT | SFT | GRPO Dense | GRPO Sparse |
-|-------------|:-------:|:---:|:----------:|:-----------:|
-| Add two numbers | 100% | 100% | 100% | 100% |
-| Subtract numbers | 100% | 100% | 100% | 100% |
-| Multiply numbers | 96.1% | 94.1% | 96.1% | 96.1% |
-| Divide evenly | 100% | 100% | 97.8% | 97.8% |
-| Reduce fractions | 100% | 100% | 100% | 100% |
-| Integer exponents | 100% | 100% | 100% | 97.7% |
-| Linear equations | **94.4%** | 87.0% | 85.2% | 85.2% |
-| Two-step equations | **63.5%** | 58.7% | 49.2% | 28.6% |
-| Solve using algebra | 100% | 100% | 94.1% | 100% |
-| Solve inequalities | 0% | 0% | 0% | 0% |
+| Problem Type | CPT+SFT | SFT | SFT+GRPO Dense | SFT+GRPO Sparse | CPT+SFT+GRPO Dense | CPT+SFT+GRPO Sparse |
+|-------------|:-------:|:---:|:--------------:|:---------------:|:------------------:|:-------------------:|
+| Add two numbers | 100% | 100% | 100% | 100% | 100% | 100% |
+| Subtract numbers | 100% | 100% | 100% | 100% | 100% | 100% |
+| Multiply numbers | 96.1% | 94.1% | 96.1% | 96.1% | 92.2% | 92.2% |
+| Divide evenly | 100% | 100% | 97.8% | 97.8% | 100% | 100% |
+| Reduce fractions | 100% | 100% | 100% | 100% | 100% | 100% |
+| Integer exponents | 100% | 100% | 100% | 97.7% | 100% | 100% |
+| Linear equations | **94.4%** | 87.0% | 85.2% | 85.2% | 72.2% | 63.0% |
+| Two-step equations | **63.5%** | 58.7% | 49.2% | 28.6% | 49.2% | 39.7% |
+| Solve using algebra | 100% | 100% | 94.1% | 100% | 97.1% | 100% |
+| Solve inequalities | 0% | 0% | 0% | 0% | 0% | 0% |
 
 ### 5.3 Key Observations
 
-**1. CPT + SFT is the best method (+1.6% over SFT, +3.4% over GRPO dense)**
+**1. CPT + SFT is the best method — GRPO consistently degrades performance**
+
+| Ranking | Method | Exact Match | Delta vs CPT+SFT |
+|:-------:|--------|:-----------:|:-----------------:|
+| 1 | CPT + SFT | 85.2% | baseline |
+| 2 | SFT only | 83.6% | -1.6% |
+| 3 | SFT + GRPO (dense) | 81.8% | -3.4% |
+| 4 | CPT + SFT + GRPO (dense) | 80.4% | -4.8% |
+| 5 | SFT + GRPO (sparse) | 79.4% | -5.8% |
+| 6 | CPT + SFT + GRPO (sparse) | 78.4% | -6.8% |
 
 The continued pre-training stage provides domain adaptation that improves downstream fine-tuning. The gains are most pronounced on complex problem types:
 - Linear equations: CPT+SFT 94.4% vs SFT 87.0% (+7.4%)
 - Two-step equations: CPT+SFT 63.5% vs SFT 58.7% (+4.8%)
 
-**2. GRPO does NOT improve over SFT in this setting**
+**2. GRPO always hurts performance regardless of base model**
 
-Contrary to expectations, both GRPO variants performed worse than SFT alone:
-- SFT+GRPO (dense): -1.8% vs SFT
-- SFT+GRPO (sparse): -4.2% vs SFT
+Adding GRPO on top of any model (SFT or CPT+SFT) consistently reduces accuracy:
+- SFT → SFT+GRPO dense: 83.6% → 81.8% (-1.8%)
+- SFT → SFT+GRPO sparse: 83.6% → 79.4% (-4.2%)
+- CPT+SFT → CPT+SFT+GRPO dense: 85.2% → 80.4% (-4.8%)
+- CPT+SFT → CPT+SFT+GRPO sparse: 85.2% → 78.4% (-6.8%)
 
-**3. Dense reward > Sparse reward (within GRPO)**
+GRPO causes more damage to CPT+SFT (-4.8%/-6.8%) than to SFT alone (-1.8%/-4.2%), suggesting that the better the base model, the more RL exploration disrupts learned knowledge.
 
-Dense GRPO (81.8%) outperforms Sparse GRPO (79.4%), confirming that multi-signal feedback provides more useful gradient signal than binary correctness alone.
+**3. Dense reward > Sparse reward (consistent across both base models)**
 
-**4. Two-step equations are the differentiator**
+| Base Model | Dense | Sparse | Gap |
+|-----------|:-----:|:------:|:---:|
+| SFT | 81.8% | 79.4% | +2.4% |
+| CPT+SFT | 80.4% | 78.4% | +2.0% |
 
-This is the hardest non-trivial type and shows the clearest separation:
-- CPT+SFT: 63.5% → SFT: 58.7% → GRPO dense: 49.2% → GRPO sparse: 28.6%
+Dense reward consistently outperforms sparse by ~2% — the partial credit signals (proximity, format, reasoning) provide better gradient than binary correctness alone.
+
+**4. Two-step equations and linear equations are the key differentiators**
+
+These complex types show the clearest separation between methods:
+
+Two-step equations: CPT+SFT (63.5%) > SFT (58.7%) > SFT+GRPO dense = CPT+SFT+GRPO dense (49.2%) > CPT+SFT+GRPO sparse (39.7%) > SFT+GRPO sparse (28.6%)
+
+Linear equations: CPT+SFT (94.4%) > SFT (87.0%) > SFT+GRPO dense/sparse (85.2%) > CPT+SFT+GRPO dense (72.2%) > CPT+SFT+GRPO sparse (63.0%)
 
 GRPO sparse catastrophically degrades on multi-step reasoning — the binary reward provides no learning signal for partial progress.
 
 **5. Format and reasoning are saturated**
 
-All methods achieve 100% format and reasoning scores, indicating that even basic SFT is sufficient to teach output structure for this dataset.
+All 6 methods achieve 100% format and reasoning scores, indicating that even basic SFT is sufficient to teach output structure for this dataset.
 
 **6. Inequalities remain unsolved**
 
@@ -470,7 +495,7 @@ All methods score 0% on inequalities — this problem type likely requires funda
 
 ## 6. Analysis: Why GRPO Underperforms
 
-The GRPO results contradict findings from larger-scale RL papers. Several factors explain this:
+The GRPO results contradict findings from larger-scale RL papers. With 6 experiments confirming the pattern, several factors explain this:
 
 ### 6.1 Small Model Capacity (0.6B)
 
@@ -478,15 +503,25 @@ A 600M parameter model has limited capacity for the explore-exploit trade-off in
 
 ### 6.2 Already-High SFT Baseline
 
-The SFT model already achieves 83.6% — most "easy" problems are solved. GRPO's exploration primarily affects the remaining 16.4% of hard problems, but the generation quality for these problems may be too poor to provide meaningful reward signal.
+The SFT model already achieves 83.6% (CPT+SFT: 85.2%) — most "easy" problems are solved. GRPO's exploration primarily affects the remaining hard problems, but the generation quality for these problems may be too poor to provide meaningful reward signal.
 
-### 6.3 Limited GRPO Training (1000 prompts)
+### 6.3 GRPO Causes "Catastrophic Forgetting" of Learned Knowledge
 
-With only 1000 prompts × 4 generations × 1 epoch, the RL stage may not have sufficient training signal to improve without overfitting. The model may be "unlearning" some SFT knowledge during the RL phase.
+The strongest evidence: CPT+SFT+GRPO dense drops linear equations from 94.4% to 72.2% (−22.2%). The RL phase actively unlearns knowledge acquired during CPT+SFT, particularly for problem types requiring precise multi-step reasoning.
 
-### 6.4 Reward Function Limitations
+The better the base model (CPT+SFT > SFT), the more GRPO damages it:
+- GRPO on SFT: −1.8% (dense), −4.2% (sparse)
+- GRPO on CPT+SFT: −4.8% (dense), −6.8% (sparse)
 
-The dense reward's proximity and reasoning components may introduce noise. For example, a wrong answer that is numerically close to the correct one receives partial credit, potentially reinforcing incorrect reasoning paths.
+This suggests GRPO's reward-based exploration disrupts fine-grained reasoning patterns that supervised learning established.
+
+### 6.4 Limited GRPO Training Budget (1000 prompts)
+
+With only 1000 prompts × 4 generations × 1 epoch, the RL stage may not have sufficient training signal to improve. The model is "unlearning" SFT knowledge faster than it can discover improvements through exploration.
+
+### 6.5 Reward Function Limitations
+
+The dense reward's proximity and reasoning components may introduce noise. For example, a wrong answer that is numerically close to the correct one receives partial credit, potentially reinforcing incorrect reasoning paths. Even dense reward cannot prevent the overall degradation — it only mitigates it (~2% better than sparse).
 
 ---
 
@@ -517,13 +552,15 @@ For production deployment, additional optimizations to consider:
 
 ### Key Findings
 
-1. **CPT + SFT is the most effective pipeline** for adapting a small LLM to a specific math domain. Domain pre-training on plain text passages before instruction tuning provides measurable gains (+1.6% overall, +7.4% on linear equations).
+1. **CPT + SFT is the most effective pipeline** (85.2%) for adapting a small LLM to a specific math domain. Domain pre-training on plain text passages before instruction tuning provides measurable gains (+1.6% over SFT, +7.4% on linear equations).
 
-2. **GRPO is not beneficial at this scale/setting**. For a 0.6B model with high SFT baseline and limited RL budget, reinforcement learning degrades performance rather than improving it.
+2. **GRPO consistently degrades performance** regardless of base model. All 4 GRPO variants (dense/sparse × SFT/CPT+SFT) scored lower than their respective base models. The full 3-stage pipeline (CPT+SFT+GRPO) is the worst-performing CPT variant.
 
-3. **Dense reward mitigates GRPO damage** but cannot overcome the fundamental scaling limitation. The multi-signal reward still outperforms binary correctness within the GRPO framework.
+3. **The better the base model, the more GRPO hurts it**. GRPO on CPT+SFT causes −4.8% to −6.8% degradation vs −1.8% to −4.2% on SFT alone. RL exploration is more destructive when there is more learned knowledge to lose.
 
-4. **Output format is easy to learn** — all methods saturate format/reasoning scores, suggesting this is not a meaningful differentiator for this dataset.
+4. **Dense reward > Sparse reward** consistently (~2% gap), but neither can prevent overall degradation from RL at this scale.
+
+5. **Output format is trivially learned** — all 6 methods achieve 100% format/reasoning scores after SFT.
 
 ### Recommended Pipeline
 
@@ -533,17 +570,21 @@ For production deployment of Qwen3-0.6B on math reasoning:
 Qwen3-0.6B → CPT (2 epochs, 2e-4 LR) → SFT (3 epochs, 1e-4 LR)
 ```
 
-Skip GRPO unless:
-- Using a larger model (>=7B) where RL exploration is more effective
-- Having significantly more RL training budget (>5000 prompts, multiple epochs)
-- The SFT baseline is low (<70%), leaving more room for RL improvement
+**Do NOT add GRPO** at this scale. The 2-stage pipeline outperforms all 3-stage variants.
+
+### When GRPO Might Help
+
+- Model size >= 7B (more capacity for exploration)
+- SFT baseline < 70% (more room for RL to improve)
+- GRPO budget > 5000 prompts with multiple epochs
+- Tasks where format diversity matters (not saturated by SFT)
 
 ### Future Work
 
-- Test CPT+SFT+GRPO pipeline (GRPO on top of CPT+SFT model)
-- Increase GRPO budget (5000+ prompts, 2-3 epochs) to test if longer training helps
-- Try DPO (Direct Preference Optimization) as a simpler RL alternative
-- Scale to larger models (Qwen3-1.7B, 4B) where GRPO may be more effective
+- Increase GRPO budget (5000+ prompts, 2-3 epochs) to test if longer training overcomes forgetting
+- Try DPO (Direct Preference Optimization) as a less destructive RL alternative
+- Scale to larger models (Qwen3-1.7B, 4B) where GRPO may finally help
+- Add KL divergence constraint tuning (lower beta) to reduce forgetting
 - Address inequality solving with targeted data augmentation
 
 ---
