@@ -298,6 +298,9 @@ def train_grpo(
         run_name=run_name,
     )
 
+    if not hasattr(model, "warnings_issued"):
+        model.warnings_issued = {}
+
     trainer = GRPOTrainer(
         model=model,
         processing_class=tokenizer,
