@@ -1,16 +1,17 @@
-"""Experiment: CPT+SFT vs SFT vs GRPO (dense/sparse) on LSReasoning-15000.
+"""Experiment: 6 fine-tuning pipelines on LSReasoning-15000.
 
 Uses a single 80/20 train/test split for all methods:
-1. CPT + SFT (continued pre-training then supervised fine-tuning)
+1. CPT + SFT
 2. SFT only
 3. SFT -> GRPO (dense reward)
 4. SFT -> GRPO (sparse reward)
+5. CPT + SFT -> GRPO (dense reward)
+6. CPT + SFT -> GRPO (sparse reward)
 
 All methods train on the same 80% and evaluate on the same 20%.
 
 Usage:
     python scripts/run_experiment_lsreasoning.py
-    python scripts/run_experiment_lsreasoning.py --skip-sft --skip-grpo-dense
     python scripts/run_experiment_lsreasoning.py --skip-cpt --skip-sft --skip-grpo-dense --skip-grpo-sparse
 """
 
@@ -229,6 +230,58 @@ def main():
                                            verbose=args.verbose)
 
     # ================================================================
+    # Experiment 5: CPT + SFT -> GRPO (dense)
+    # ================================================================
+    cpt_grpo_dense_output = "outputs/cpt_grpo_lsreasoning_dense"
+    if not args.skip_grpo_dense:
+        run_step("GRPO on CPT+SFT (Dense Reward)", train_grpo,
+                 sft_path=f"{cpt_sft_output}/final",
+                 model_name=args.model_name,
+                 train_file=str(TRAIN_FILE),
+                 output_dir=cpt_grpo_dense_output,
+                 reward_mode="dense",
+                 max_seq_length=args.max_seq_length,
+                 max_prompts=args.grpo_max_prompts,
+                 epochs=args.grpo_epochs,
+                 lr=args.grpo_lr,
+                 batch_size=args.grpo_batch_size,
+                 num_generations=args.grpo_num_generations,
+                 beta=args.grpo_beta,
+                 seed=args.seed)
+
+    results["CPT+SFT+GRPO_dense"] = run_step("Evaluate CPT+SFT+GRPO (Dense)", evaluate_model,
+                                              model_path=f"{cpt_grpo_dense_output}/final",
+                                              test_file=str(TEST_FILE),
+                                              num_eval=args.num_eval,
+                                              verbose=args.verbose)
+
+    # ================================================================
+    # Experiment 6: CPT + SFT -> GRPO (sparse)
+    # ================================================================
+    cpt_grpo_sparse_output = "outputs/cpt_grpo_lsreasoning_sparse"
+    if not args.skip_grpo_sparse:
+        run_step("GRPO on CPT+SFT (Sparse Reward)", train_grpo,
+                 sft_path=f"{cpt_sft_output}/final",
+                 model_name=args.model_name,
+                 train_file=str(TRAIN_FILE),
+                 output_dir=cpt_grpo_sparse_output,
+                 reward_mode="sparse",
+                 max_seq_length=args.max_seq_length,
+                 max_prompts=args.grpo_max_prompts,
+                 epochs=args.grpo_epochs,
+                 lr=args.grpo_lr,
+                 batch_size=args.grpo_batch_size,
+                 num_generations=args.grpo_num_generations,
+                 beta=args.grpo_beta,
+                 seed=args.seed)
+
+    results["CPT+SFT+GRPO_sparse"] = run_step("Evaluate CPT+SFT+GRPO (Sparse)", evaluate_model,
+                                               model_path=f"{cpt_grpo_sparse_output}/final",
+                                               test_file=str(TEST_FILE),
+                                               num_eval=args.num_eval,
+                                               verbose=args.verbose)
+
+    # ================================================================
     # Save & Plot
     # ================================================================
     os.makedirs("outputs", exist_ok=True)
@@ -242,21 +295,19 @@ def main():
     plot_comparison(results)
 
     # Final comparison (console)
-    print("\n" + "=" * 60)
-    print("FINAL COMPARISON - 4 Methods")
-    print("=" * 60)
-    print(f"\n  {'Method':<20} {'Exact Match':<14} {'Close Match':<14} {'Format':<10} {'Reasoning':<10}")
-    print(f"  {'_' * 68}")
+    print("\n" + "=" * 70)
+    print("FINAL COMPARISON - 6 Methods")
+    print("=" * 70)
+    print(f"\n  {'Method':<25} {'Exact Match':<14} {'Close Match':<14} {'Format':<10} {'Reasoning':<10}")
+    print(f"  {'_' * 73}")
     for method, res in results.items():
         if res:
             em = res.get("exact_match", 0)
             cm = res.get("close_match", 0)
             fmt = res.get("format_score", 0)
             rea = res.get("reasoning_score", 0)
-            print(f"  {method:<20} {em:>6.1%}        {cm:>6.1%}        {fmt:>6.1%}    {rea:>6.1%}")
-    print()
-    print("  Expected ranking: SFT+GRPO(dense) > CPT+SFT > SFT+GRPO(sparse) > SFT")
-    print("=" * 60)
+            print(f"  {method:<25} {em:>6.1%}        {cm:>6.1%}        {fmt:>6.1%}    {rea:>6.1%}")
+    print("=" * 70)
 
 
 if __name__ == "__main__":
