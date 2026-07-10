@@ -84,14 +84,13 @@ def plot_cpt_loss(api, entity, project):
 
 
 def plot_grpo_loss(api, entity, project):
-    """Plot GRPO training loss (dense vs sparse)."""
+    """Plot GRPO training loss (dense vs sparse) for SFT-based GRPO."""
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-    # Loss
     ax = axes[0]
     runs_to_plot = [
-        ("grpo_dense", "GRPO Dense", "#E91E63"),
-        ("grpo_sparse", "GRPO Sparse", "#9C27B0"),
+        ("grpo_dense", "SFT+GRPO Dense", "#E91E63"),
+        ("grpo_sparse", "SFT+GRPO Sparse", "#9C27B0"),
     ]
 
     for run_name, label, color in runs_to_plot:
@@ -102,11 +101,10 @@ def plot_grpo_loss(api, entity, project):
 
     ax.set_xlabel("Step", fontsize=12)
     ax.set_ylabel("Training Loss", fontsize=12)
-    ax.set_title("GRPO Training Loss", fontsize=14)
+    ax.set_title("SFT+GRPO Training Loss", fontsize=14)
     ax.legend(fontsize=11)
     ax.grid(True, alpha=0.3)
 
-    # Reward
     ax = axes[1]
     for run_name, label, color in runs_to_plot:
         history = fetch_run_history(api, entity, project, run_name, ["train/reward"])
@@ -116,12 +114,70 @@ def plot_grpo_loss(api, entity, project):
 
     ax.set_xlabel("Step", fontsize=12)
     ax.set_ylabel("Mean Reward", fontsize=12)
-    ax.set_title("GRPO Mean Reward", fontsize=14)
+    ax.set_title("SFT+GRPO Mean Reward", fontsize=14)
     ax.legend(fontsize=11)
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    path = FIGURES_DIR / "grpo_train_loss_reward.png"
+    path = FIGURES_DIR / "grpo_sft_train_loss_reward.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"  Saved: {path}")
+
+
+def plot_cpt_grpo_loss(api, entity, project):
+    """Plot GRPO training loss (dense vs sparse) for CPT+SFT-based GRPO."""
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+    ax = axes[0]
+    runs_to_plot = [
+        ("grpo_dense", "CPT+SFT+GRPO Dense", "#FF5722"),
+        ("grpo_sparse", "CPT+SFT+GRPO Sparse", "#795548"),
+    ]
+
+    # CPT+SFT GRPO runs may have different names in wandb
+    # Try alternative names if the standard ones don't work
+    alt_names = [
+        ("cpt_grpo_dense", "CPT+SFT+GRPO Dense", "#FF5722"),
+        ("cpt_grpo_sparse", "CPT+SFT+GRPO Sparse", "#795548"),
+    ]
+
+    found = False
+    for run_name, label, color in alt_names:
+        history = fetch_run_history(api, entity, project, run_name, ["train/loss"])
+        if history is not None and "train/loss" in history.columns:
+            data = history["train/loss"].dropna()
+            ax.plot(data.index, data.values, label=label, color=color, linewidth=1.5)
+            found = True
+
+    if not found:
+        for run_name, label, color in runs_to_plot:
+            history = fetch_run_history(api, entity, project, run_name, ["train/loss"])
+            if history is not None and "train/loss" in history.columns:
+                data = history["train/loss"].dropna()
+                ax.plot(data.index, data.values, label="CPT+" + label, color=color, linewidth=1.5)
+
+    ax.set_xlabel("Step", fontsize=12)
+    ax.set_ylabel("Training Loss", fontsize=12)
+    ax.set_title("CPT+SFT+GRPO Training Loss", fontsize=14)
+    ax.legend(fontsize=11)
+    ax.grid(True, alpha=0.3)
+
+    ax = axes[1]
+    for run_name, label, color in alt_names:
+        history = fetch_run_history(api, entity, project, run_name, ["train/reward"])
+        if history is not None and "train/reward" in history.columns:
+            data = history["train/reward"].dropna()
+            ax.plot(data.index, data.values, label=label, color=color, linewidth=1.5)
+
+    ax.set_xlabel("Step", fontsize=12)
+    ax.set_ylabel("Mean Reward", fontsize=12)
+    ax.set_title("CPT+SFT+GRPO Mean Reward", fontsize=14)
+    ax.legend(fontsize=11)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    path = FIGURES_DIR / "grpo_cpt_sft_train_loss_reward.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  Saved: {path}")
@@ -143,7 +199,7 @@ def plot_eval_comparison():
     exact_match = [results[m]["exact_match"] * 100 for m in methods]
     close_match = [results[m]["close_match"] * 100 for m in methods]
 
-    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    fig, ax = plt.subplots(1, 1, figsize=(12, 6))
 
     x = range(len(methods))
     width = 0.35
@@ -152,9 +208,9 @@ def plot_eval_comparison():
 
     ax.set_xlabel("Method", fontsize=12)
     ax.set_ylabel("Accuracy (%)", fontsize=12)
-    ax.set_title("Evaluation Results Comparison", fontsize=14)
+    ax.set_title("Evaluation Results Comparison (6 Methods)", fontsize=14)
     ax.set_xticks(x)
-    ax.set_xticklabels(methods, fontsize=10)
+    ax.set_xticklabels(methods, fontsize=9, rotation=15, ha="right")
     ax.legend(fontsize=11)
     ax.grid(True, alpha=0.3, axis="y")
     ax.set_ylim(70, 90)
@@ -197,23 +253,25 @@ def plot_by_problem_type():
     if not interesting_types:
         return
 
-    fig, ax = plt.subplots(1, 1, figsize=(12, 7))
+    fig, ax = plt.subplots(1, 1, figsize=(14, 7))
 
     x = range(len(interesting_types))
-    width = 0.2
-    colors = ["#4CAF50", "#2196F3", "#E91E63", "#9C27B0"]
+    n_methods = len(methods)
+    width = 0.8 / n_methods
+    colors = ["#4CAF50", "#2196F3", "#E91E63", "#9C27B0", "#FF5722", "#795548"]
 
-    for i, (method, color) in enumerate(zip(methods, colors)):
+    for i, method in enumerate(methods):
+        color = colors[i % len(colors)]
         scores = [results[method].get("by_type", {}).get(t, 0) * 100 for t in interesting_types]
         ax.bar([xi + i * width for xi in x], scores, width, label=method, color=color)
 
     ax.set_xlabel("Problem Type", fontsize=12)
     ax.set_ylabel("Accuracy (%)", fontsize=12)
-    ax.set_title("Accuracy by Problem Type", fontsize=14)
-    ax.set_xticks([xi + width * 1.5 for xi in x])
+    ax.set_title("Accuracy by Problem Type (6 Methods)", fontsize=14)
+    ax.set_xticks([xi + width * (n_methods - 1) / 2 for xi in x])
     short_labels = [t.replace("Solve the ", "").replace("Solve a ", "").replace(".", "") for t in interesting_types]
     ax.set_xticklabels(short_labels, fontsize=9, rotation=15, ha="right")
-    ax.legend(fontsize=10, loc="upper right")
+    ax.legend(fontsize=9, loc="upper right")
     ax.grid(True, alpha=0.3, axis="y")
 
     plt.tight_layout()
@@ -238,19 +296,22 @@ def main():
 
     api = wandb.Api()
 
-    print("[1/5] CPT loss curve...")
+    print("[1/6] CPT loss curve...")
     plot_cpt_loss(api, args.entity, args.project)
 
-    print("[2/5] SFT loss curves...")
+    print("[2/6] SFT loss curves...")
     plot_sft_loss(api, args.entity, args.project)
 
-    print("[3/5] GRPO loss + reward curves...")
+    print("[3/6] SFT+GRPO loss + reward curves...")
     plot_grpo_loss(api, args.entity, args.project)
 
-    print("[4/5] Evaluation comparison...")
+    print("[4/6] CPT+SFT+GRPO loss + reward curves...")
+    plot_cpt_grpo_loss(api, args.entity, args.project)
+
+    print("[5/6] Evaluation comparison (6 methods)...")
     plot_eval_comparison()
 
-    print("[5/5] Accuracy by problem type...")
+    print("[6/6] Accuracy by problem type (6 methods)...")
     plot_by_problem_type()
 
     print(f"\nAll figures saved to {FIGURES_DIR}/")

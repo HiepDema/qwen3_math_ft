@@ -394,12 +394,19 @@ So sánh SFT loss giữa 2 pipelines:
 - **CPT+SFT** (green): Bắt đầu từ CPT checkpoint, loss khởi đầu thấp hơn do đã adapted domain
 - **SFT only** (blue): Bắt đầu từ base model, loss khởi đầu cao hơn
 
-### 4.3 GRPO Training Loss & Reward
+### 4.3 SFT+GRPO Training Loss & Reward
 
-![GRPO Training Loss and Reward](figures/grpo_train_loss_reward.png)
+![SFT+GRPO Training Loss and Reward](figures/grpo_sft_train_loss_reward.png)
 
-- **Left**: GRPO training loss cho Dense vs Sparse reward
+- **Left**: Training loss cho SFT+GRPO Dense vs Sparse
 - **Right**: Mean reward progression — Dense reward cung cấp gradient phong phú hơn, reward tăng nhanh hơn
+
+### 4.4 CPT+SFT+GRPO Training Loss & Reward
+
+![CPT+SFT+GRPO Training Loss and Reward](figures/grpo_cpt_sft_train_loss_reward.png)
+
+- **Left**: Training loss cho CPT+SFT+GRPO Dense vs Sparse
+- **Right**: Mean reward — starting point cao hơn SFT+GRPO do base model (CPT+SFT) đã tốt hơn, nhưng vẫn không dẫn tới kết quả eval tốt hơn
 
 ---
 
