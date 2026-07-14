@@ -75,7 +75,8 @@ def generate_response(model, tokenizer, question):
         {"role": "user", "content": question},
     ]
     input_text = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
+        messages, tokenize=False, add_generation_prompt=True,
+        enable_thinking=False,
     )
     inputs = tokenizer(input_text, return_tensors="pt").to(model.device)
     with torch.no_grad():
@@ -110,7 +111,8 @@ def generate_batch(model, tokenizer, questions, batch_size=16):
                 {"role": "user", "content": q},
             ]
             prompts.append(tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
+                messages, tokenize=False, add_generation_prompt=True,
+                enable_thinking=False,
             ))
 
         inputs = tokenizer(

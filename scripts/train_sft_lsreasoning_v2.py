@@ -50,7 +50,8 @@ def format_conversations(data, tokenizer):
             {"role": "assistant", "content": assistant_response},
         ]
         text = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=False
+            messages, tokenize=False, add_generation_prompt=False,
+            enable_thinking=False,
         )
         conversations.append(text)
 

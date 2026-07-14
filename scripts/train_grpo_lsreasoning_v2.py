@@ -248,7 +248,8 @@ def train_grpo(
             {"role": "user", "content": item["question"]},
         ]
         prompt_text = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
+            messages, tokenize=False, add_generation_prompt=True,
+            enable_thinking=False,
         )
         dataset_records.append({"prompt": prompt_text})
         metadata.append({
