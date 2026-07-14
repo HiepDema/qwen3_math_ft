@@ -207,7 +207,7 @@ def batch_solve(req: BatchRequest):
     return BatchResponse(results=results, total_time_ms=round(elapsed, 1))
 
 
-def load_model_transformers(model_path: str, compile_model: bool = False):
+def load_model_transformers(model_path: str):
     """Load model with unsloth/transformers."""
     global model, tokenizer
     from unsloth import FastLanguageModel
@@ -219,17 +219,7 @@ def load_model_transformers(model_path: str, compile_model: bool = False):
         dtype=torch.float16,
     )
     FastLanguageModel.for_inference(model)
-
-    if compile_model:
-        print("Applying torch.compile (warmup may take a moment)...")
-        model.forward = torch.compile(model.forward, mode="reduce-overhead")
-        # Warmup run
-        dummy = tokenizer("test", return_tensors="pt").to(model.device)
-        with torch.no_grad():
-            model.generate(**dummy, max_new_tokens=5, do_sample=False, pad_token_id=tokenizer.eos_token_id)
-        print("torch.compile warmup done")
-
-    print(f"Model loaded (transformers{'+compile' if compile_model else ''}): {model_path}")
+    print(f"Model loaded (transformers): {model_path}")
 
 
 def load_model_vllm(model_path: str):
@@ -267,8 +257,6 @@ def main():
 
     if args.backend == "vllm":
         load_model_vllm(args.model_path)
-    elif args.backend == "optimized":
-        load_model_transformers(args.model_path, compile_model=True)
     else:
         load_model_transformers(args.model_path)
 
