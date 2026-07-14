@@ -222,7 +222,8 @@ def main():
         if resp.status_code != 200:
             print(f"Server not healthy: {resp.status_code}")
             return
-        print(f"Server OK: {resp.json()}")
+        health = resp.json()
+        print(f"Server OK: {health}")
     except Exception as e:
         print(f"Cannot connect to server: {e}")
         return
@@ -235,6 +236,7 @@ def main():
     # Save results
     all_results = {
         "server_url": args.url,
+        "backend": health.get("backend", "unknown"),
         "single_request": single_results,
         "batch": batch_results,
         "concurrent": concurrent_results,
@@ -244,6 +246,9 @@ def main():
     with open(args.output, "w") as f:
         json.dump(all_results, f, indent=2)
     print(f"\nResults saved to {args.output}")
+    print(f"\nTo compare backends, restart server with different --backend and re-run benchmark:")
+    print(f"  python scripts/serve_model.py --model-path hiep-2/qwen3-0.6b-math-cpt-sft --backend optimized")
+    print(f"  python scripts/benchmark_deployment.py --output outputs/benchmark_optimized.json")
 
 
 if __name__ == "__main__":

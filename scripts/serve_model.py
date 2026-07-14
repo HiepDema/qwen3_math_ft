@@ -5,15 +5,23 @@ Endpoints:
     POST /batch  - Solve multiple problems
     GET  /health - Health check
 
+Backends:
+    transformers  - Default, simple
+    optimized     - Static KV Cache + torch.compile (faster)
+    vllm          - Production-grade (fastest, requires vllm package)
+
 Usage:
-    # Using transformers (simple, works everywhere)
-    python scripts/serve_model.py --model-path outputs/cpt_sft_lsreasoning/merged
+    # Default (transformers)
+    python scripts/serve_model.py --model-path hiep-2/qwen3-0.6b-math-cpt-sft
 
-    # Using vLLM (faster, recommended for production)
-    python scripts/serve_model.py --model-path outputs/cpt_sft_lsreasoning/merged --backend vllm
+    # Optimized (static KV cache + torch.compile)
+    python scripts/serve_model.py --model-path hiep-2/qwen3-0.6b-math-cpt-sft --backend optimized
 
-    # Custom port
-    python scripts/serve_model.py --model-path outputs/cpt_sft_lsreasoning/merged --port 8080
+    # vLLM (production)
+    python scripts/serve_model.py --model-path hiep-2/qwen3-0.6b-math-cpt-sft --backend vllm
+
+    # Multi-worker (for concurrent requests)
+    python scripts/serve_model.py --model-path hiep-2/qwen3-0.6b-math-cpt-sft --workers 2
 
 Requirements:
     pip install fastapi uvicorn
@@ -63,12 +71,8 @@ class BatchResponse(BaseModel):
     total_time_ms: float
 
 
-def generate_transformers(questions: list[str], max_new_tokens: int = 256) -> list[str]:
-    """Generate using transformers + unsloth."""
-    tokenizer.padding_side = "left"
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
+def build_prompts(questions: list[str]) -> list[str]:
+    """Build chat prompts from questions."""
     prompts = []
     for q in questions:
         messages = [
@@ -79,7 +83,16 @@ def generate_transformers(questions: list[str], max_new_tokens: int = 256) -> li
             messages, tokenize=False, add_generation_prompt=True,
             enable_thinking=False,
         ))
+    return prompts
 
+
+def generate_transformers(questions: list[str], max_new_tokens: int = 256) -> list[str]:
+    """Generate using transformers + unsloth (baseline)."""
+    tokenizer.padding_side = "left"
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    prompts = build_prompts(questions)
     inputs = tokenizer(
         prompts, return_tensors="pt", padding=True, truncation=True, max_length=768
     ).to(model.device)
@@ -101,20 +114,40 @@ def generate_transformers(questions: list[str], max_new_tokens: int = 256) -> li
     return responses
 
 
+def generate_optimized(questions: list[str], max_new_tokens: int = 256) -> list[str]:
+    """Generate with static KV cache (optimized)."""
+    tokenizer.padding_side = "left"
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    prompts = build_prompts(questions)
+    inputs = tokenizer(
+        prompts, return_tensors="pt", padding=True, truncation=True, max_length=768
+    ).to(model.device)
+
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            pad_token_id=tokenizer.pad_token_id,
+            cache_implementation="static",
+        )
+
+    responses = []
+    for j, output in enumerate(outputs):
+        prompt_len = inputs["input_ids"][j].ne(tokenizer.pad_token_id).sum()
+        response = tokenizer.decode(output[prompt_len:], skip_special_tokens=True)
+        responses.append(response.strip())
+
+    return responses
+
+
 def generate_vllm(questions: list[str], max_new_tokens: int = 256) -> list[str]:
-    """Generate using vLLM."""
+    """Generate using vLLM (production)."""
     from vllm import SamplingParams
 
-    prompts = []
-    for q in questions:
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": q},
-        ]
-        prompts.append(tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        ))
-
+    prompts = build_prompts(questions)
     sampling_params = SamplingParams(
         max_tokens=max_new_tokens,
         temperature=0,
@@ -128,16 +161,24 @@ def health():
     return {"status": "ok", "backend": backend, "model_loaded": model is not None}
 
 
+def get_generator():
+    """Get the appropriate generator function based on backend."""
+    if backend == "vllm":
+        return generate_vllm
+    elif backend == "optimized":
+        return generate_optimized
+    else:
+        return generate_transformers
+
+
 @app.post("/solve", response_model=SolveResponse)
 def solve(req: SolveRequest):
     if model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
+    gen = get_generator()
     start = time.perf_counter()
-    if backend == "vllm":
-        responses = generate_vllm([req.question], req.max_new_tokens)
-    else:
-        responses = generate_transformers([req.question], req.max_new_tokens)
+    responses = gen([req.question], req.max_new_tokens)
     elapsed = (time.perf_counter() - start) * 1000
 
     return SolveResponse(
@@ -154,11 +195,9 @@ def batch_solve(req: BatchRequest):
     if len(req.questions) > 64:
         raise HTTPException(status_code=400, detail="Max 64 questions per batch")
 
+    gen = get_generator()
     start = time.perf_counter()
-    if backend == "vllm":
-        responses = generate_vllm(req.questions, req.max_new_tokens)
-    else:
-        responses = generate_transformers(req.questions, req.max_new_tokens)
+    responses = gen(req.questions, req.max_new_tokens)
     elapsed = (time.perf_counter() - start) * 1000
 
     results = [
@@ -168,7 +207,7 @@ def batch_solve(req: BatchRequest):
     return BatchResponse(results=results, total_time_ms=round(elapsed, 1))
 
 
-def load_model_transformers(model_path: str):
+def load_model_transformers(model_path: str, compile_model: bool = False):
     """Load model with unsloth/transformers."""
     global model, tokenizer
     from unsloth import FastLanguageModel
@@ -180,7 +219,17 @@ def load_model_transformers(model_path: str):
         dtype=torch.float16,
     )
     FastLanguageModel.for_inference(model)
-    print(f"Model loaded (transformers): {model_path}")
+
+    if compile_model:
+        print("Applying torch.compile (warmup may take a moment)...")
+        model.forward = torch.compile(model.forward, mode="reduce-overhead")
+        # Warmup run
+        dummy = tokenizer("test", return_tensors="pt").to(model.device)
+        with torch.no_grad():
+            model.generate(**dummy, max_new_tokens=5, do_sample=False, pad_token_id=tokenizer.eos_token_id)
+        print("torch.compile warmup done")
+
+    print(f"Model loaded (transformers{'+compile' if compile_model else ''}): {model_path}")
 
 
 def load_model_vllm(model_path: str):
@@ -203,10 +252,12 @@ def main():
     global backend
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model-path", type=str, default="outputs/cpt_sft_lsreasoning/merged")
-    parser.add_argument("--backend", choices=["transformers", "vllm"], default="transformers")
+    parser.add_argument("--model-path", type=str, default="hiep-2/qwen3-0.6b-math-cpt-sft")
+    parser.add_argument("--backend", choices=["transformers", "optimized", "vllm"], default="transformers")
     parser.add_argument("--host", type=str, default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Number of uvicorn workers (for concurrent requests)")
     args = parser.parse_args()
 
     backend = args.backend
@@ -216,16 +267,20 @@ def main():
 
     if args.backend == "vllm":
         load_model_vllm(args.model_path)
+    elif args.backend == "optimized":
+        load_model_transformers(args.model_path, compile_model=True)
     else:
         load_model_transformers(args.model_path)
 
     print(f"\nStarting server at http://{args.host}:{args.port}")
+    print(f"  Backend: {args.backend}")
+    print(f"  Workers: {args.workers}")
     print(f"  POST /solve  - Solve one problem")
     print(f"  POST /batch  - Solve multiple problems")
     print(f"  GET  /health - Health check")
     print()
 
-    uvicorn.run(app, host=args.host, port=args.port)
+    uvicorn.run(app, host=args.host, port=args.port, workers=args.workers)
 
 
 if __name__ == "__main__":
