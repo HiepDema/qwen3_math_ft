@@ -76,7 +76,8 @@ def generate_transformers(questions: list[str], max_new_tokens: int = 256) -> li
             {"role": "user", "content": q},
         ]
         prompts.append(tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
+            messages, tokenize=False, add_generation_prompt=True,
+            enable_thinking=False,
         ))
 
     inputs = tokenizer(
