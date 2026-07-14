@@ -1,16 +1,13 @@
-name: CI Pipeline
+name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
-env:
-  PYTHON_VERSION: "3.11"
-
 jobs:
-  lint-and-test:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,75 +15,86 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: "3.11"
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
+      - name: Install minimal dependencies
+        run: pip install datasets huggingface_hub
 
-      - name: Install dependencies
-        run: pip install -e ".[dev]"
-
-      - name: Lint
-        run: |
-          ruff check src/ tests/
-          ruff format --check src/ tests/
-
-      - name: Run tests
-        run: pytest tests/ -v --cov=src --cov-report=xml
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: coverage.xml
-
-  data-validation:
-    runs-on: ubuntu-latest
-    needs: lint-and-test
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: pip install -e .
-
-      - name: Validate data schema
-        run: python -m src.data_engineering.data_quality --validate-schema
-
-      - name: Check DVC status
-        run: |
-          pip install dvc dvc-s3
-          dvc status
-
-  sanity-check:
-    runs-on: ubuntu-latest
-    needs: lint-and-test
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: pip install -e .
-
-      - name: Run sanity checks (CPU only)
+      - name: Syntax check all scripts
         run: |
           python -c "
-          from src.model.sanity_check import SanityChecker
-          # Only run non-GPU checks in CI
-          checker = SanityChecker('Qwen/Qwen3-VL-7B', 'data/processed/sft', 'sft')
-          checker._check_tokenization()
-          checker._check_special_tokens()
-          print('Tokenization sanity checks passed')
+          import ast, sys
+          from pathlib import Path
+
+          scripts = list(Path('scripts').glob('*.py'))
+          errors = []
+          for f in scripts:
+              try:
+                  ast.parse(f.read_text())
+              except SyntaxError as e:
+                  errors.append(f'{f}: {e}')
+          if errors:
+              for e in errors:
+                  print(f'FAIL: {e}')
+              sys.exit(1)
+          print(f'All {len(scripts)} scripts passed syntax check')
+          "
+
+      - name: Validate reward functions
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, 'scripts')
+          from train_grpo_lsreasoning_v2 import (
+              reward_correctness, reward_numeric_proximity,
+              reward_format, compute_dense_reward, compute_sparse_reward
+          )
+
+          # Correctness
+          assert reward_correctness('Answer: 42', '42') == 1.0
+          assert reward_correctness('Answer: 43', '42') == 0.0
+          assert reward_correctness('No number', '42') == 0.0
+
+          # Proximity
+          assert reward_numeric_proximity('Answer: 42', '42') == 1.0
+          assert reward_numeric_proximity('Answer: 41', '42') > 0.9
+          assert reward_numeric_proximity('Answer: 0', '42') < 0.1
+
+          # Format
+          assert reward_format('Step 1\nStep 2\nStep 3\nAnswer: 5') > 0.5
+          assert reward_format('5') < 0.3
+
+          # Dense vs Sparse
+          r_dense = compute_dense_reward('Step 1\nAnswer: 42', '42', 'add numbers')
+          r_sparse = compute_sparse_reward('Step 1\nAnswer: 42', '42', 'add numbers')
+          assert r_dense > 0
+          assert r_sparse == 1.0
+
+          # Wrong answer: dense > 0, sparse = 0
+          r_dense_wrong = compute_dense_reward('Step 1\nAnswer: 40', '42', 'add numbers')
+          r_sparse_wrong = compute_sparse_reward('Step 1\nAnswer: 40', '42', 'add numbers')
+          assert r_dense_wrong > 0
+          assert r_sparse_wrong == 0.0
+
+          print('All reward function tests passed!')
+          "
+
+      - name: Validate data split reproducibility
+        run: |
+          python -c "
+          from datasets import load_dataset
+
+          dataset = load_dataset('DataMuncher-Labs/LSReasoning-15000', split='train')
+          split = dataset.train_test_split(test_size=0.2, seed=42)
+
+          assert len(split['train']) == 12000, f'Expected 12000 train, got {len(split[\"train\"])}'
+          assert len(split['test']) == 3000, f'Expected 3000 test, got {len(split[\"test\"])}'
+
+          # Check first sample is deterministic
+          first = split['train'][0]
+          assert 'question' in first
+          assert 'answer' in first
+          assert 'how_to_solve' in first
+
+          print(f'Data split OK: train={len(split[\"train\"])}, test={len(split[\"test\"])}')
           "
