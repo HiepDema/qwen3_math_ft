@@ -17,176 +17,183 @@
 
 ---
 
-## 2. Single Request Performance
+## 2. Benchmark Results — Transformers Backend (Baseline)
+
+### 2.1 Single Request Performance
 
 | Metric | Value |
 |--------|:-----:|
-| **Latency P50** | 1002.9 ms |
-| **Latency P95** | 1192.0 ms |
-| **Latency P99** | 1192.0 ms |
-| **Latency Mean** | 937.5 ms |
-| **Latency Min** | 557.5 ms |
-| **Latency Max** | 1192.0 ms |
-| **Throughput** | 1.07 req/s |
-| **Tokens/sec** | 18.7 tok/s |
+| **Latency P50** | 1591.2 ms |
+| **Latency P95** | 2046.7 ms |
+| **Latency P99** | 2046.7 ms |
+| **Latency Mean** | 1513.7 ms |
+| **Latency Min** | 881.3 ms |
+| **Latency Max** | 2046.7 ms |
+| **Throughput** | 0.66 req/s |
+| **Tokens/sec** | 11.6 tok/s |
 | **Avg Response Length** | 17.5 tokens |
 
-### Timing Breakdown
+### 2.2 Timing Breakdown
 
 ```
-┌─────────────────────────────────────────────────┐
-│           Single Request (~938 ms)              │
-├────────────┬────────────────────────────────────┤
-│  Prefill   │           Decode                   │
-│  ~141 ms   │          ~797 ms                   │
-│   (15%)    │           (85%)                    │
-└────────────┴────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│           Single Request (~1514 ms)                 │
+├────────────┬────────────────────────────────────────┤
+│  Prefill   │              Decode                    │
+│  ~227 ms   │            ~1287 ms                    │
+│   (15%)    │             (85%)                      │
+└────────────┴────────────────────────────────────────┘
 ```
 
-| Phase | Time | Description |
-|-------|:----:|-------------|
-| **Prefill** | ~141 ms (15%) | Encode input prompt, compute initial KV cache |
-| **Decode** | ~797 ms (85%) | Generate tokens one by one (autoregressive) |
+| Phase | Time | % | Description |
+|-------|:----:|:-:|-------------|
+| **Prefill** | 227 ms | 15% | Encode input prompt, compute initial KV cache |
+| **Decode** | 1287 ms | 85% | Generate tokens autoregressively (~17.5 tokens) |
 
-Decode dominates — model generates ~17.5 tokens per response at ~22 tokens/sec decode speed.
-
----
-
-## 3. Batch Performance
+### 2.3 Batch Performance
 
 | Batch Size | Total Time | Time/Request | Tokens/sec | Speedup vs BS=1 |
 |:----------:|:----------:|:------------:|:----------:|:----------------:|
-| 1 | 632 ms | 632 ms | 17.4 | 1.0x |
-| 2 | 1515 ms | 758 ms | 24.4 | 1.4x |
-| 4 | 1529 ms | 382 ms | 50.4 | 2.9x |
-| 8 | 1572 ms | 197 ms | 96.1 | 5.5x |
-| **16** | **1583 ms** | **99 ms** | **186.3** | **10.7x** |
-
-### Batch Scaling Chart
+| 1 | 1234 ms | 1234 ms | 8.9 | 1.0x |
+| 2 | 2908 ms | 1454 ms | 12.7 | 1.4x |
+| 4 | 2792 ms | 698 ms | 27.6 | 3.1x |
+| 8 | 2847 ms | 356 ms | 53.0 | 6.0x |
+| **16** | **2831 ms** | **177 ms** | **104.2** | **11.7x** |
 
 ```
-Tokens/sec vs Batch Size:
+Tokens/sec vs Batch Size (Transformers Backend):
 
- 186 ┤                                          ████
+ 104 ┤                                          ████
      │                                          ████
- 150 ┤                                          ████
-     │                                          ████
- 120 ┤                                          ████
+  80 ┤                                          ████
      │                              ████        ████
-  96 ┤                              ████        ████
+  53 ┤                              ████        ████
      │                              ████        ████
-  60 ┤                  ████        ████        ████
-  50 ┤                  ████        ████        ████
-     │      ████        ████        ████        ████
-  24 ┤      ████        ████        ████        ████
-  17 ┤████  ████        ████        ████        ████
+  40 ┤                              ████        ████
+     │                  ████        ████        ████
+  28 ┤                  ████        ████        ████
+     │                  ████        ████        ████
+  13 ┤      ████        ████        ████        ████
+   9 ┤████  ████        ████        ████        ████
      └──────────────────────────────────────────────
       BS=1  BS=2        BS=4        BS=8       BS=16
 ```
 
-**Key insight**: Batch size 16 gives **10.7x throughput improvement** over single request at only 2.5x wall time — near-linear scaling due to GPU parallelism on the small 0.6B model.
+**Key insight**: Batch size 16 delivers **11.7x throughput** over single request — near-linear GPU utilization scaling.
+
+### 2.4 Concurrent Request Performance
+
+| Concurrency | Wall Time | Mean Latency | Effective RPS |
+|:-----------:|:---------:|:------------:|:-------------:|
+| 1 | 1.15s | 1.15s | 0.87 |
+| 2 | 2.30s | 2.21s | 0.87 |
+| 4 | 59.07s | 58.94s | 0.07 |
+| 8 | 107.17s | 106.98s | 0.07 |
+
+**Critical finding**: Server collapses at concurrency ≥ 4 (from 0.87 RPS to 0.07 RPS). Single-worker FastAPI cannot handle concurrent GPU requests — they queue sequentially and each waits for the previous to complete.
 
 ---
 
-## 4. Concurrent Request Performance
+## 3. Optimization Strategies
 
-| Concurrency | Wall Time | Mean Latency | Max Latency | Effective RPS |
-|:-----------:|:---------:|:------------:|:-----------:|:-------------:|
-| 1 | 645 ms | 644 ms | 644 ms | 1.55 |
-| 2 | 1252 ms | 1250 ms | 1250 ms | 1.60 |
-| 4 | 25,090 ms | 24,922 ms | 25,089 ms | 0.16 |
-| 8 | 41,211 ms | 40,943 ms | 41,207 ms | 0.19 |
+### 3.1 Available Backends
 
-### Analysis
+| Backend | Description | Command |
+|---------|-------------|---------|
+| `transformers` | Baseline, dynamic KV cache | `--backend transformers` |
+| `optimized` | Static KV cache + torch.compile | `--backend optimized` |
+| `vllm` | Continuous batching, PagedAttention | `--backend vllm` |
 
+### 3.2 Static KV Cache
+
+Pre-allocates memory for the KV cache instead of dynamically growing it per token:
+
+```python
+model.generate(..., cache_implementation="static")
 ```
-Effective RPS vs Concurrency:
 
-  1.60 ┤  ●────●
-       │ /
-  1.55 ┤●
-       │
-  1.00 ┤
-       │
-  0.50 ┤
-       │              ●
-  0.19 ┤                        ●
-  0.16 ┤
-       └──────────────────────────
-        1     2       4         8
-            Concurrency
+**Expected improvement**: 5-15% latency reduction on decode phase by eliminating memory reallocation overhead per generated token.
+
+### 3.3 torch.compile
+
+JIT-compiles the model's forward pass into optimized CUDA kernels:
+
+```python
+model.forward = torch.compile(model.forward, mode="reduce-overhead")
 ```
 
-**Concurrent requests degrade significantly beyond 2**. This is because:
+**Expected improvement**: 10-30% faster forward passes after initial warmup. Most effective on repeated identical computation patterns (autoregressive decode).
 
-1. **Single-worker server**: Uvicorn processes requests sequentially by default
-2. **No continuous batching**: Requests queue up instead of being batched together
-3. **GPU memory contention**: Multiple simultaneous forward passes compete for VRAM
+### 3.4 vLLM Backend
 
-**Recommendation**: Use the `/batch` endpoint instead of concurrent `/solve` calls — batch size 16 achieves 186 tok/s vs concurrent 4 at effectively 0.16 RPS.
+Production-grade serving with:
+- **Continuous batching**: New requests join mid-generation without waiting
+- **PagedAttention**: Efficient KV cache memory management
+- **Speculative decoding**: Predict multiple tokens at once
 
----
-
-## 5. Performance Summary
-
-| Use Case | Recommended Approach | Expected Performance |
-|----------|---------------------|---------------------|
-| Interactive (1 user) | `/solve` endpoint | ~1s latency, 1 req/s |
-| Batch processing | `/batch` with BS=16 | 99 ms/req, 186 tok/s |
-| High throughput | `/batch` with BS=8-16 | 10x single request throughput |
-| Multiple concurrent users | Queue + batch | NOT concurrent `/solve` |
+**Expected improvement**: 3-5x throughput, handles concurrent requests natively.
 
 ---
 
-## 6. Bottleneck Analysis
+## 4. Performance Summary & Recommendations
 
-| Bottleneck | Impact | Mitigation |
-|-----------|--------|-----------|
-| **Autoregressive decoding** | 85% of latency | Shorter responses, speculative decoding |
-| **Single worker** | No parallelism for concurrent users | Add workers or use vLLM |
-| **4-bit quantization overhead** | Dequantization per token | Use merged fp16 model |
-| **No continuous batching** | Concurrent requests queue | Switch to vLLM/TGI |
+### Current Baseline Performance
+
+| Metric | Single Request | Batch (BS=16) |
+|--------|:--------------:|:-------------:|
+| Latency | 1514 ms | 177 ms/req |
+| Throughput | 0.66 req/s | ~5.6 req/s |
+| Tokens/sec | 11.6 | 104.2 |
+
+### Recommendations by Use Case
+
+| Use Case | Approach | Expected Performance |
+|----------|---------|---------------------|
+| Interactive (1 user) | `/solve`, transformers | ~1.5s per question |
+| Batch jobs | `/batch` BS=16 | 177ms/question, 104 tok/s |
+| Multiple users (2-4) | vLLM backend | ~500ms/question concurrent |
+| High throughput | vLLM + batch | 300+ tok/s |
+
+### Bottleneck Analysis
+
+| Bottleneck | Impact | Solution |
+|-----------|--------|----------|
+| Autoregressive decode | 85% of latency | Shorter max_new_tokens, speculative decoding |
+| Single worker | No concurrent handling | vLLM or multiple workers |
+| Dynamic KV cache | Memory reallocation per token | Static cache (`--backend optimized`) |
+| 4-bit dequantization | Per-token overhead | fp16 merged model (uses more VRAM) |
+| No continuous batching | Requests queue up | vLLM backend |
 
 ---
 
-## 7. Production Recommendations
-
-### Current Setup (suitable for demo/prototype)
-- Single A10, single worker, FastAPI + Transformers
-- Good for: ≤2 concurrent users, batch processing jobs
-
-### Upgrade Path for Production
-
-| Level | Change | Expected Improvement |
-|-------|--------|---------------------|
-| 1 | Switch to **vLLM** backend | 3-5x throughput (continuous batching) |
-| 2 | Add **multiple workers** (2-4) | Linear RPS scaling for concurrent users |
-| 3 | Use **fp16 merged model** (no 4-bit) | ~20% faster decode, uses more VRAM |
-| 4 | Add **load balancer** + multiple GPUs | Horizontal scaling |
-
-### Quick vLLM Deployment
+## 5. Deployment Commands
 
 ```bash
+# Baseline
+python scripts/serve_model.py --model-path hiep-2/qwen3-0.6b-math-cpt-sft --backend transformers
+
+# Optimized (static KV cache + torch.compile)
+python scripts/serve_model.py --model-path hiep-2/qwen3-0.6b-math-cpt-sft --backend optimized
+
+# vLLM (production)
 pip install vllm
 python scripts/serve_model.py --model-path hiep-2/qwen3-0.6b-math-cpt-sft --backend vllm
-```
 
-Expected improvement with vLLM:
-- Continuous batching → handle concurrent requests efficiently
-- PagedAttention → better memory utilization
-- ~3-5x throughput improvement over current setup
+# Benchmark
+python scripts/benchmark_deployment.py --output outputs/benchmark_results.json
+```
 
 ---
 
-## 8. API Reference
+## 6. API Reference
 
 ### POST /solve
 ```json
 // Request
 {"question": "Solve for x: 3x + 7 = 22", "max_new_tokens": 256}
 
-// Response
-{"question": "...", "response": "Approach: ...\nAnswer: 5", "time_ms": 937.5}
+// Response  
+{"question": "...", "response": "Approach: ...\nAnswer: 5", "time_ms": 1514.0}
 ```
 
 ### POST /batch
@@ -195,25 +202,10 @@ Expected improvement with vLLM:
 {"questions": ["What is 2+2?", "Solve: 5x=25"], "max_new_tokens": 256}
 
 // Response
-{"results": [...], "total_time_ms": 1583.3}
+{"results": [...], "total_time_ms": 2831.0}
 ```
 
 ### GET /health
 ```json
 {"status": "ok", "backend": "transformers", "model_loaded": true}
-```
-
----
-
-## 9. Deployment Commands
-
-```bash
-# Start server
-python scripts/serve_model.py --model-path hiep-2/qwen3-0.6b-math-cpt-sft
-
-# Run benchmark
-python scripts/benchmark_deployment.py --url http://localhost:8000
-
-# Access API docs
-http://<server-ip>:8000/docs
 ```
