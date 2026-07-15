@@ -178,17 +178,21 @@ def benchmark_concurrent(url: str, concurrency_levels: list = [1, 2, 4, 8]):
 
         def send_request(q):
             start = time.perf_counter()
-            resp = http_requests.post(
-                f"{url}/solve",
-                json={"question": q, "max_new_tokens": 256},
-            )
-            elapsed = (time.perf_counter() - start) * 1000
-            return elapsed if resp.status_code == 200 else None
+            try:
+                resp = http_requests.post(
+                    f"{url}/solve",
+                    json={"question": q, "max_new_tokens": 256},
+                    timeout=60,
+                )
+                elapsed = (time.perf_counter() - start) * 1000
+                return elapsed if resp.status_code == 200 else None
+            except Exception:
+                return None
 
         start = time.perf_counter()
         with ThreadPoolExecutor(max_workers=conc) as executor:
             futures = [executor.submit(send_request, q) for q in questions]
-            latencies = [f.result() for f in as_completed(futures)]
+            latencies = [f.result(timeout=120) for f in as_completed(futures, timeout=120)]
         wall_time = (time.perf_counter() - start) * 1000
 
         latencies = [l for l in latencies if l is not None]
