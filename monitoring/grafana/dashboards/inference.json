@@ -1,150 +1,200 @@
 {
   "annotations": {"list": []},
   "editable": true,
-  "fiscalYearStartMonth": 0,
-  "graphTooltip": 1,
-  "links": [],
   "panels": [
+    {
+      "title": "System Monitoring",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "collapsed": false
+    },
     {
       "title": "Request Rate (req/s)",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
-      "fieldConfig": {
-        "defaults": {"unit": "reqps"},
-        "overrides": []
-      },
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 1},
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
       "targets": [
-        {
-          "expr": "rate(request_count_total[1m])",
-          "legendFormat": "{{endpoint}} - {{status}}"
-        }
+        {"expr": "rate(request_count_total[1m])", "legendFormat": "{{endpoint}} {{status}}"}
       ]
     },
     {
-      "title": "Request Latency (P50 / P95 / P99)",
+      "title": "Latency P50 / P95 / P99",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
-      "fieldConfig": {
-        "defaults": {"unit": "s"},
-        "overrides": []
-      },
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 1},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
       "targets": [
-        {
-          "expr": "histogram_quantile(0.5, rate(request_latency_seconds_bucket[5m]))",
-          "legendFormat": "P50"
-        },
-        {
-          "expr": "histogram_quantile(0.95, rate(request_latency_seconds_bucket[5m]))",
-          "legendFormat": "P95"
-        },
-        {
-          "expr": "histogram_quantile(0.99, rate(request_latency_seconds_bucket[5m]))",
-          "legendFormat": "P99"
-        }
-      ]
-    },
-    {
-      "title": "Total Requests",
-      "type": "stat",
-      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8},
-      "fieldConfig": {
-        "defaults": {"unit": "short"},
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "sum(request_count_total)",
-          "legendFormat": "Total"
-        }
+        {"expr": "histogram_quantile(0.5, rate(request_latency_seconds_bucket[5m]))", "legendFormat": "P50"},
+        {"expr": "histogram_quantile(0.95, rate(request_latency_seconds_bucket[5m]))", "legendFormat": "P95"},
+        {"expr": "histogram_quantile(0.99, rate(request_latency_seconds_bucket[5m]))", "legendFormat": "P99"}
       ]
     },
     {
       "title": "Error Rate",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8},
-      "fieldConfig": {
-        "defaults": {"unit": "percentunit", "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.01}]}},
-        "overrides": []
-      },
+      "gridPos": {"h": 7, "w": 4, "x": 16, "y": 1},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.01}]}}, "overrides": []},
       "targets": [
-        {
-          "expr": "sum(rate(request_count_total{status=~\"4..|5..\"}[5m])) / sum(rate(request_count_total[5m]))",
-          "legendFormat": "Error %"
-        }
+        {"expr": "sum(rate(request_count_total{status=~'4..|5..'}[5m])) / sum(rate(request_count_total[5m]))", "legendFormat": "Error %"}
       ]
     },
     {
-      "title": "GPU Memory Used (GB)",
-      "type": "gauge",
-      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8},
-      "fieldConfig": {
-        "defaults": {
-          "unit": "decgbytes",
-          "min": 0,
-          "max": 24,
-          "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 16}, {"color": "red", "value": 22}]}
-        },
-        "overrides": []
-      },
+      "title": "Uptime",
+      "type": "stat",
+      "gridPos": {"h": 7, "w": 4, "x": 20, "y": 1},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
       "targets": [
-        {
-          "expr": "gpu_memory_used_bytes / 1073741824",
-          "legendFormat": "GPU Memory"
-        }
+        {"expr": "uptime_seconds", "legendFormat": "Uptime"}
+      ]
+    },
+    {
+      "title": "GPU Memory",
+      "type": "gauge",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "decgbytes", "min": 0, "max": 24, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 16}, {"color": "red", "value": 22}]}}, "overrides": []},
+      "targets": [
+        {"expr": "gpu_memory_used_bytes / 1073741824", "legendFormat": "Used GB"}
+      ]
+    },
+    {
+      "title": "GPU Utilization %",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": []},
+      "targets": [
+        {"expr": "gpu_utilization_percent", "legendFormat": "GPU %"}
+      ]
+    },
+    {
+      "title": "CPU %",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": []},
+      "targets": [
+        {"expr": "cpu_utilization_percent", "legendFormat": "CPU %"}
+      ]
+    },
+    {
+      "title": "RAM Usage",
+      "type": "gauge",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 8},
+      "fieldConfig": {"defaults": {"unit": "decgbytes", "min": 0, "max": 64}, "overrides": []},
+      "targets": [
+        {"expr": "ram_used_bytes / 1073741824", "legendFormat": "Used GB"}
+      ]
+    },
+    {
+      "title": "Prediction Monitoring",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14},
+      "collapsed": false
+    },
+    {
+      "title": "Response Length Distribution",
+      "type": "histogram",
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 15},
+      "targets": [
+        {"expr": "response_length_tokens_bucket", "legendFormat": "{{le}}"}
+      ]
+    },
+    {
+      "title": "Answer Parse Rate / Format Rate / Reasoning Rate",
+      "type": "timeseries",
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 15},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}, "overrides": []},
+      "targets": [
+        {"expr": "answer_parse_rate", "legendFormat": "Parseable Answer"},
+        {"expr": "format_compliance_rate", "legendFormat": "Format (Answer:)"},
+        {"expr": "reasoning_rate", "legendFormat": "Has Reasoning"}
+      ]
+    },
+    {
+      "title": "Predicted Answer Distribution",
+      "type": "histogram",
+      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 15},
+      "targets": [
+        {"expr": "predicted_answer_value_bucket", "legendFormat": "{{le}}"}
+      ]
+    },
+    {
+      "title": "Data Quality",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22},
+      "collapsed": false
+    },
+    {
+      "title": "Empty Responses",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 23},
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "targets": [
+        {"expr": "empty_response_total", "legendFormat": "Empty"}
+      ]
+    },
+    {
+      "title": "Outlier Responses",
+      "type": "stat",
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 23},
+      "targets": [
+        {"expr": "outlier_response_total", "legendFormat": "Outlier"}
+      ]
+    },
+    {
+      "title": "Schema Valid Rate",
+      "type": "gauge",
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 23},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.7}, {"color": "green", "value": 0.9}]}}, "overrides": []},
+      "targets": [
+        {"expr": "schema_valid_rate", "legendFormat": "Valid"}
       ]
     },
     {
       "title": "Model Status",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 8},
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]
-        },
-        "overrides": []
-      },
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 23},
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}, "overrides": []},
       "targets": [
-        {
-          "expr": "model_loaded",
-          "legendFormat": "Status"
-        }
+        {"expr": "model_loaded", "legendFormat": "Status"}
       ]
     },
     {
-      "title": "Latency by Endpoint",
+      "title": "Model Performance (Periodic Eval)",
+      "type": "row",
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 28},
+      "collapsed": false
+    },
+    {
+      "title": "Accuracy (Exact / Close Match)",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
-      "fieldConfig": {
-        "defaults": {"unit": "s"},
-        "overrides": []
-      },
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 29},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}, "overrides": []},
       "targets": [
-        {
-          "expr": "histogram_quantile(0.95, rate(request_latency_seconds_bucket{endpoint=\"/solve\"}[5m]))",
-          "legendFormat": "/solve P95"
-        },
-        {
-          "expr": "histogram_quantile(0.95, rate(request_latency_seconds_bucket{endpoint=\"/batch\"}[5m]))",
-          "legendFormat": "/batch P95"
-        }
+        {"expr": "model_exact_match_accuracy", "legendFormat": "Exact Match"},
+        {"expr": "model_close_match_accuracy", "legendFormat": "Close Match"}
       ]
     },
     {
-      "title": "Request Count by Status",
-      "type": "piechart",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "title": "Error Metrics (MAE / RMSE)",
+      "type": "timeseries",
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 29},
       "targets": [
-        {
-          "expr": "sum by (status) (request_count_total)",
-          "legendFormat": "{{status}}"
-        }
+        {"expr": "model_mae", "legendFormat": "MAE"},
+        {"expr": "model_rmse", "legendFormat": "RMSE"}
+      ]
+    },
+    {
+      "title": "MAPE / Format Score",
+      "type": "timeseries",
+      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 29},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}, "overrides": []},
+      "targets": [
+        {"expr": "model_mape", "legendFormat": "MAPE"},
+        {"expr": "model_format_score", "legendFormat": "Format Score"}
       ]
     }
   ],
   "schemaVersion": 39,
-  "tags": ["math-reasoning", "inference"],
-  "templating": {"list": []},
+  "tags": ["math-reasoning", "inference", "monitoring"],
   "time": {"from": "now-1h", "to": "now"},
-  "title": "Math Reasoning API - Inference Monitoring",
+  "title": "Math Reasoning API - Full Monitoring (26 Metrics)",
   "uid": "math-reasoning-inference"
 }
