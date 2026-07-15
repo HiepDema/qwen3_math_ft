@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: math-reasoning-api
+  namespace: math-reasoning
+  labels:
+    app: math-reasoning-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: math-reasoning-api
+  template:
+    metadata:
+      labels:
+        app: math-reasoning-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: math-reasoning-api
+          image: math-reasoning-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "2"
+              nvidia.com/gpu: 1
+            limits:
+              memory: "8Gi"
+              cpu: "4"
+              nvidia.com/gpu: 1
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          env:
+            - name: HF_HOME
+              value: /app/.cache/huggingface
+            - name: TRANSFORMERS_CACHE
+              value: /app/.cache/huggingface
+          volumeMounts:
+            - name: model-cache
+              mountPath: /app/.cache
+      volumes:
+        - name: model-cache
+          emptyDir:
+            sizeLimit: 10Gi
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
