@@ -71,25 +71,6 @@ Speedup: 6.8x across both phases
 | 8 | 96.1 | 98.5 | 870.0 | **9.1x** |
 | 16 | 186.3 | 185.5 | **1642.8** | **8.8x** |
 
-```
-Batch Throughput (tok/s):
-
-1643 ┤                                    ▓▓   ██ = Transformers
-     │                                    ▓▓   ░░ = Optimized
-1200 ┤                                    ▓▓   ▓▓ = vLLM
-     │                            ▓▓      ▓▓
- 870 ┤                            ▓▓      ▓▓
-     │                    ▓▓      ▓▓      ▓▓
- 464 ┤                    ▓▓      ▓▓      ▓▓
- 251 ┤            ▓▓      ▓▓      ▓▓      ▓▓
- 186 ┤██ ░░       ▓▓      ▓▓      ▓▓      ▓▓
- 129 ┤██ ░░ ▓▓    ▓▓      ▓▓      ▓▓      ▓▓
-  96 ┤██ ░░ ▓▓    ▓▓      ▓▓      ▓▓      ▓▓
-  50 ┤██ ░░ ▓▓ ██ ░░ ▓▓ ██░░ ▓▓ ██░░ ▓▓ ██░░ ▓▓
-     └──────────────────────────────────────────────
-      BS=16       BS=8      BS=4     BS=2     BS=1
-```
-
 **vLLM achieves 1642.8 tok/s at batch 16** — nearly **9x** the throughput of Transformers/Optimized backends.
 
 ### 2.4 Concurrent Request Performance
