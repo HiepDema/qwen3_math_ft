@@ -10,7 +10,6 @@
 | **Framework** | FastAPI + Uvicorn |
 | **Max New Tokens** | 256 tokens |
 | **Decoding** | Greedy (temperature=0) |
-| **Batch Support** | Up to 64 questions per request |
 
 ### Backends Tested
 
@@ -133,8 +132,6 @@ Speedup: 6.8x across both phases
 | Batch 16 throughput | 186 tok/s | 186 tok/s | **1643 tok/s** | vLLM (8.8x) |
 | Prefill latency | 141 ms | 149 ms | **21 ms** | vLLM (6.8x) |
 | Decode latency | 797 ms | 845 ms | **117 ms** | vLLM (6.8x) |
-| Concurrent 4 RPS | 0.16 | 3.90 | **~7+** | vLLM |
-| Setup complexity | Low | Low | Medium | Transformers |
 
 ### Key Takeaways
 
